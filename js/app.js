@@ -159,19 +159,34 @@ async function fetchCategory(catId) {
 
     const json = await res.json();
 
+    // wger language ID → ISO short code (covers the IDs we care about)
+    const LANG_ID = { 1: 'de', 2: 'en', 3: 'bg', 4: 'es', 5: 'ru',
+                      6: 'nl', 7: 'pt', 8: 'cs', 21: 'sq' };
+
     const exercises = json.results.map(ex => {
-      // Build names + descriptions keyed by language short code
+      // Build names + descriptions keyed by language short code.
+      // wger may return `language` as a nested object {id, short_name}
+      // OR as a plain integer ID — handle both.
       const names        = {};
       const descriptions = {};
       for (const tr of (ex.translations || [])) {
-        const short = tr.language?.short_name;
+        const lang  = tr.language;
+        const short = typeof lang === 'object'
+          ? (lang?.short_name || LANG_ID[lang?.id])
+          : LANG_ID[lang];
         if (short && tr.name?.trim()) {
           names[short] = tr.name.trim();
           const d = stripHtml(tr.description || '');
           if (d) descriptions[short] = d.slice(0, 300);
         }
       }
-      if (!names.en) return null; // skip if no English name at all
+      // Some exerciseinfo responses include a top-level `name` field
+      if (!names.en && ex.name?.trim()) names.en = ex.name.trim();
+      // Fall back to any available translation rather than dropping the exercise
+      if (!names.en) {
+        const first = Object.values(names)[0];
+        if (first) names.en = first; else return null;
+      }
 
       // Muscle names: wger provides name_en; also map localised names where the
       // API field exists (name_es, name_de, …). Albanian (sq) not provided by
@@ -241,7 +256,8 @@ async function loadExercisesForWorkout(wt) {
 
   for (const cat of wt.categories) {
     const live = await fetchCategory(cat.id);
-    const pool = live ?? FALLBACK[cat.id] ?? [];
+    // ?? only catches null/undefined — also fall back when API returned []
+    const pool = (live && live.length > 0) ? live : (FALLBACK[cat.id] ?? []);
     fetchedPool[cat.id] = pool;
 
     const withImg    = pool.filter(e => e.image);
