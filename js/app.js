@@ -272,8 +272,8 @@ function renderHome() {
   const done    = !!todayEntry();
   const history = getHistory();
 
-  document.querySelector('#view-home .section-label:first-child').textContent = t('todaySuggestion');
-  document.querySelector('#view-home .section-label:last-of-type').textContent = t('muscleStatus');
+  document.getElementById('label-today').textContent  = t('todaySuggestion');
+  document.getElementById('label-status').textContent = t('muscleStatus');
 
   // Suggestion card — uses only hardcoded data; sanitize for defence-in-depth
   document.getElementById('suggestion-card').innerHTML = `
@@ -376,7 +376,7 @@ function renderExercises(exercises, wt, alreadyDone) {
 }
 
 function renderHistory() {
-  document.querySelector('#view-history .section-label').textContent = t('workoutHistory');
+  document.getElementById('label-history').textContent = t('workoutHistory');
   const history   = getHistory();
   const container = document.getElementById('history-list');
 
@@ -574,12 +574,32 @@ function toast(msg) {
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); }, 2800);
 }
 
+// ─── iOS viewport height ──────────────────────────────────────────────────────
+
+// iOS Safari's address bar changes the viewport height when scrolling.
+// Reading window.innerHeight and storing it as a CSS variable gives a stable,
+// accurate height that won't cause content to be clipped or overflow.
+function setAppHeight() {
+  document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
+
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === currentLang)
   );
   updateNavLabels();
   renderHome();
-});
+}
+
+// Works whether DOMContentLoaded already fired (inline scripts) or not (defer)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

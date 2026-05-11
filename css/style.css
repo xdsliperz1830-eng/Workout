@@ -9,37 +9,75 @@
   --header-h: 60px;
   --r: 14px;
   --t: 0.2s ease;
+  /* set by JS for accurate iOS viewport height */
+  --app-h: 100dvh;
+  /* safe area shorthands */
+  --sat: env(safe-area-inset-top,    0px);
+  --sab: env(safe-area-inset-bottom, 0px);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* ─── Reset ──────────────────────────────────────── */
 
-html, body {
-  height: 100%;
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove iOS default button chrome */
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  /* Eliminate 300 ms tap delay on iOS */
+  touch-action: manipulation;
+}
+
+html {
+  /* Required for viewport-fit=cover on iOS */
+  height: -webkit-fill-available;
+}
+
+body {
+  height: 100vh;
+  height: var(--app-h);
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  /* Prevent double-tap zoom on iOS */
+  touch-action: manipulation;
 }
+
+/* ─── App shell ──────────────────────────────────── */
 
 #app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* Use JS-measured height so iOS Safari URL bar doesn't clip content */
+  height: 100vh;
+  height: var(--app-h);
   max-width: 500px;
   margin: 0 auto;
 }
 
-/* ─── Header ─────────────────────────────────── */
+/* ─── Header ──────────────────────────────────────── */
 
 .app-header {
   display: flex;
-  align-items: center;
-  padding: 0 16px;
-  height: var(--header-h);
+  align-items: flex-end;        /* align items at bottom so they sit above safe zone */
+  padding: 0 16px 12px;
+  /* Push content below status bar / Dynamic Island */
+  padding-top: max(var(--sat), 12px);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  min-height: calc(var(--header-h) + var(--sat));
 }
 
 .header-left {
@@ -49,16 +87,21 @@ html, body {
   flex: 1;
 }
 
+.header-icon { font-size: 26px; line-height: 1; }
+
+.app-header h1 { font-size: 18px; font-weight: 800; line-height: 1; }
+.app-header p  { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
 /* ─── Language switcher ──────────────────────────── */
 
 .lang-switcher {
   display: flex;
   gap: 2px;
   margin-left: auto;
+  align-items: center;
 }
 
 .lang-btn {
-  background: none;
   border: 2px solid transparent;
   border-radius: 8px;
   font-size: 22px;
@@ -67,23 +110,22 @@ html, body {
   cursor: pointer;
   opacity: .35;
   transition: opacity .2s, border-color .2s;
+  touch-action: manipulation;
 }
 .lang-btn.active {
   opacity: 1;
   border-color: rgba(255,255,255,.3);
 }
 
-.header-icon { font-size: 26px; }
-
-.app-header h1 { font-size: 18px; font-weight: 800; line-height: 1; }
-.app-header p  { font-size: 12px; color: var(--text2); margin-top: 2px; }
-
-/* ─── Main scroll area ───────────────────────── */
+/* ─── Main scroll area ───────────────────────────── */
 
 #main {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* Prevent pull-to-refresh interfering with app */
+  overscroll-behavior-y: contain;
 }
 
 .view { padding: 16px; }
@@ -97,7 +139,7 @@ html, body {
   margin-bottom: 10px;
 }
 
-/* ─── Suggestion card ────────────────────────── */
+/* ─── Suggestion card ────────────────────────────── */
 
 .s-card {
   border-radius: var(--r);
@@ -117,7 +159,7 @@ html, body {
   pointer-events: none;
 }
 
-.s-emoji  { font-size: 38px; display: block; margin-bottom: 8px; }
+.s-emoji  { font-size: 38px; display: block; margin-bottom: 8px; line-height: 1; }
 .s-name   { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 4px; line-height: 1.1; }
 .s-desc   { font-size: 13px; opacity: .75; margin-bottom: 14px; }
 
@@ -146,12 +188,13 @@ html, body {
   font-weight: 700;
   cursor: pointer;
   transition: var(--t);
-  backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  touch-action: manipulation;
 }
 .btn-start:active { background: rgba(255,255,255,.25); transform: scale(.98); }
 
-/* ─── Muscle status list ─────────────────────── */
+/* ─── Muscle status list ─────────────────────────── */
 
 .status-row {
   display: flex;
@@ -166,18 +209,18 @@ html, body {
 .status-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .status-name  { font-size: 14px; font-weight: 600; }
 .status-subs  { font-size: 11px; color: var(--text2); margin-top: 1px; }
-.status-days  { font-size: 12px; color: var(--text2); }
+.status-days  { font-size: 12px; color: var(--text2); flex-shrink: 0; margin-left: 8px; }
 .status-days.ripe   { color: #E74C3C; }
 .status-days.medium { color: #F39C12; }
 .status-days.fresh  { color: #2ECC71; }
 
-/* ─── Workout header ─────────────────────────── */
+/* ─── Workout header ─────────────────────────────── */
 
 .wkt-header { margin-bottom: 12px; }
 .wkt-header h2 { font-size: 22px; font-weight: 900; }
 .wkt-header p  { font-size: 13px; color: var(--text2); margin-top: 2px; }
 
-/* ─── Exercise grid ──────────────────────────── */
+/* ─── Exercise grid ──────────────────────────────── */
 
 .exercise-grid {
   display: grid;
@@ -192,6 +235,7 @@ html, body {
   cursor: pointer;
   transition: transform var(--t);
   position: relative;
+  touch-action: manipulation;
 }
 .ex-card:active { transform: scale(.97); }
 
@@ -204,14 +248,17 @@ html, body {
 
 .ex-img {
   position: absolute;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0; /* inset: 0 — fallback for older iOS */
   width: 100%; height: 100%;
   object-fit: cover;
+  /* Prevent iOS from adding image callout on long-press */
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .ex-placeholder {
   position: absolute;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -237,22 +284,21 @@ html, body {
   padding: 2px 7px;
   font-size: 11px;
   font-weight: 700;
-  backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .ex-info { padding: 8px 10px 10px; }
 .ex-name { font-size: 12px; font-weight: 700; line-height: 1.3; }
 .ex-mus  { font-size: 10px; color: var(--text2); margin-top: 2px; }
 
-/* ─── Complete button ────────────────────────── */
+/* ─── Complete button ────────────────────────────── */
 
 .complete-wrap { padding: 14px 0 8px; }
 
 .btn-complete {
   width: 100%;
   padding: 15px;
-  border: none;
   border-radius: var(--r);
   background: linear-gradient(135deg, #1E8449, #27AE60);
   color: #fff;
@@ -260,6 +306,7 @@ html, body {
   font-weight: 700;
   cursor: pointer;
   transition: transform var(--t), opacity var(--t);
+  touch-action: manipulation;
 }
 .btn-complete:active { transform: scale(.98); }
 .btn-complete.done {
@@ -268,7 +315,7 @@ html, body {
   cursor: default;
 }
 
-/* ─── Loading states ─────────────────────────── */
+/* ─── Loading states ─────────────────────────────── */
 
 .loading-wrap {
   grid-column: 1/-1;
@@ -289,7 +336,7 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ─── History ────────────────────────────────── */
+/* ─── History ────────────────────────────────────── */
 
 .hist-item {
   display: flex;
@@ -301,10 +348,10 @@ html, body {
   margin-bottom: 8px;
 }
 .hist-bar  { width: 4px; height: 44px; border-radius: 2px; flex-shrink: 0; }
-.hist-info { flex: 1; }
-.hist-name { font-size: 15px; font-weight: 700; }
+.hist-info { flex: 1; min-width: 0; }
+.hist-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist-date { font-size: 12px; color: var(--text2); margin-top: 2px; }
-.hist-icon { font-size: 22px; }
+.hist-icon { font-size: 22px; flex-shrink: 0; }
 .rest-day  { color: var(--text2); font-style: italic; }
 
 .empty-state {
@@ -316,29 +363,32 @@ html, body {
   text-align: center;
   gap: 8px;
 }
-.empty-state .big { font-size: 48px; }
-.empty-state strong { color: var(--text); font-size: 16px; }
+.empty-state .big    { font-size: 48px; }
+.empty-state strong  { color: var(--text); font-size: 16px; }
 
-/* ─── Modal ──────────────────────────────────── */
+/* ─── Modal ──────────────────────────────────────── */
 
 .modal-bg {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,.8);
-  backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   z-index: 100;
   display: flex;
   align-items: flex-end;
   padding: 12px;
+  /* Respect bottom safe area in modal */
+  padding-bottom: max(12px, var(--sab));
 }
 
 .modal-box {
   background: var(--surface);
   border-radius: 20px;
   width: 100%;
-  max-height: 82vh;
+  max-height: 78vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 20px;
   position: relative;
 }
@@ -347,13 +397,16 @@ html, body {
   position: absolute;
   top: 14px; right: 14px;
   background: var(--surface2);
-  border: none;
   color: var(--text);
-  width: 30px; height: 30px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   font-size: 15px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
+  /* Ensure it's always tappable */
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .modal-img {
@@ -362,6 +415,7 @@ html, body {
   object-fit: cover;
   border-radius: 10px;
   margin-bottom: 14px;
+  display: block;
 }
 
 .modal-img-placeholder {
@@ -379,11 +433,11 @@ html, body {
 .modal-mus   { font-size: 13px; color: var(--text2); margin-bottom: 14px; }
 .modal-desc  { font-size: 14px; line-height: 1.65; color: #ccc; }
 
-/* ─── Toast ──────────────────────────────────── */
+/* ─── Toast ──────────────────────────────────────── */
 
 .toast {
   position: fixed;
-  bottom: calc(var(--nav-h) + 14px);
+  bottom: calc(var(--nav-h) + var(--sab) + 14px);
   left: 50%;
   transform: translateX(-50%) translateY(16px);
   background: #27AE60;
@@ -403,15 +457,15 @@ html, body {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ─── Bottom nav ─────────────────────────────── */
+/* ─── Bottom nav ─────────────────────────────────── */
 
 .bottom-nav {
   display: flex;
   background: #161616;
   border-top: 1px solid var(--border);
-  height: var(--nav-h);
+  /* Height grows to cover the home indicator area */
+  padding-bottom: var(--sab);
   flex-shrink: 0;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .nav-btn {
@@ -421,14 +475,16 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  background: none;
-  border: none;
   color: var(--text2);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .5px;
   cursor: pointer;
   transition: color var(--t);
+  touch-action: manipulation;
+  /* Minimum tap target: 44×44 pt (Apple HIG) */
+  min-height: 44px;
+  padding: 8px 0;
 }
-.nav-btn svg { width: 22px; height: 22px; }
+.nav-btn svg    { width: 22px; height: 22px; }
 .nav-btn.active { color: var(--text); }
