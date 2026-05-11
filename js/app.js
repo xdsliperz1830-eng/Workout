@@ -363,6 +363,8 @@ function renderExercises(exercises, wt, alreadyDone) {
     const name    = sanitize(exName(ex));
     const muscles = sanitize(exMuscles(ex));
     const imgUrl  = safeUrl(ex.image || '');
+    const proto   = ex.proto || wt.defaultProto;
+    const protoStr = proto ? `${proto.sets}×${proto.reps}` : '';
 
     return `
       <div class="ex-card" onclick="openDetail(${i})">
@@ -380,6 +382,7 @@ function renderExercises(exercises, wt, alreadyDone) {
         <div class="ex-info">
           <div class="ex-name">${name}</div>
           <div class="ex-mus">${muscles}</div>
+          ${protoStr ? `<div class="ex-proto">${protoStr}</div>` : ''}
         </div>
       </div>
     `;
@@ -564,6 +567,30 @@ function openDetail(index) {
     mus.className = 'modal-mus';
     mus.textContent = muscles;
     box.appendChild(mus);
+  }
+
+  // Proto box (sets / reps / rest)
+  const proto = ex.proto || activeWorkout.type.defaultProto;
+  if (proto) {
+    const pb = document.createElement('div');
+    pb.className = 'proto-box';
+    [
+      { val: String(proto.sets),              lbl: t('sets') },
+      { val: String(proto.reps),              lbl: t('reps') },
+      { val: proto.rest + ' ' + t('sec'),     lbl: t('rest') },
+    ].forEach(item => {
+      const col = document.createElement('div');
+      const val = document.createElement('div');
+      val.className = 'proto-item-val';
+      val.textContent = item.val;
+      const lbl = document.createElement('div');
+      lbl.className = 'proto-item-lbl';
+      lbl.textContent = item.lbl;
+      col.appendChild(val);
+      col.appendChild(lbl);
+      pb.appendChild(col);
+    });
+    box.appendChild(pb);
   }
 
   // Description
