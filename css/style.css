@@ -46,6 +46,31 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+}
+
+/* ─── Language switcher ──────────────────────────── */
+
+.lang-switcher {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.lang-btn {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 5px;
+  cursor: pointer;
+  opacity: .35;
+  transition: opacity .2s, border-color .2s;
+}
+.lang-btn.active {
+  opacity: 1;
+  border-color: rgba(255,255,255,.3);
 }
 
 .header-icon { font-size: 26px; }
@@ -188,10 +213,19 @@ html, body {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 44px;
-  opacity: .55;
+  gap: 5px;
+  padding: 6px;
+}
+
+.ex-placeholder-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,.85);
+  text-align: center;
+  line-height: 1.2;
 }
 
 .ex-num {
@@ -328,6 +362,17 @@ html, body {
   object-fit: cover;
   border-radius: 10px;
   margin-bottom: 14px;
+}
+
+.modal-img-placeholder {
+  width: 100%;
+  height: 140px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
 }
 
 .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
