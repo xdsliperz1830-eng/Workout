@@ -2,9 +2,29 @@
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let currentLang    = localStorage.getItem('mtracker_lang') || 'en';
-let activeWorkout  = null;   // { type, exercises }
-let currentView    = 'home';
+let currentLang   = localStorage.getItem('mtracker_lang') || 'en';
+let activeWorkout = null;   // { type, exercises }
+let currentView   = 'home';
+
+// ─── Security helpers ─────────────────────────────────────────────────────────
+
+// HTML-encode any string before injecting into innerHTML
+function sanitize(str) {
+  const el = document.createElement('div');
+  el.textContent = String(str == null ? '' : str);
+  return el.innerHTML;
+}
+
+// Only allow https:// URLs sourced from the wger API; reject anything else
+function safeUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' ? url : '';
+  } catch {
+    return '';
+  }
+}
 
 // ─── i18n helpers ─────────────────────────────────────────────────────────────
 
@@ -28,14 +48,12 @@ function exDesc(ex) {
 function setLang(code) {
   if (!LANGUAGES[code]) return;
   currentLang = code;
-  localStorage.setItem('mtracker_lang', code);
+  try { localStorage.setItem('mtracker_lang', code); } catch { /* quota full — continue */ }
 
-  // Update flag button active state
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === code)
   );
 
-  // Re-render current view
   if (currentView === 'home')    renderHome();
   if (currentView === 'history') renderHistory();
   if (currentView === 'workout' && activeWorkout) {
@@ -44,7 +62,6 @@ function setLang(code) {
     renderExercises(activeWorkout.exercises, activeWorkout.type, done);
   }
 
-  // Update static nav labels
   updateNavLabels();
 }
 
@@ -57,7 +74,7 @@ function updateNavLabels() {
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const HISTORY_KEY = 'mtracker_history_v1';
-const CACHE_PFX   = 'mtracker_cache_v2_';   // v2 stores all translations
+const CACHE_PFX   = 'mtracker_cache_v2_';
 
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
@@ -67,7 +84,8 @@ function getHistory() {
 function addToHistory(workoutId, workoutName) {
   const history = getHistory().filter(h => h.date !== todayStr());
   history.unshift({ date: todayStr(), workoutId, workoutName });
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 90)));
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 90))); }
+  catch { /* storage quota exceeded — history won't persist this session */ }
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -127,16 +145,22 @@ async function fetchCategory(catId) {
   const cached = await getCached(catId);
   if (cached) return cached;
 
+  // Abort after 10 s to avoid hanging indefinitely
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 10000);
+
   try {
-    // Fetch with high limit; language=2 ensures English translation exists
     const res = await fetch(
-      `https://wger.de/api/v2/exerciseinfo/?format=json&language=2&category=${catId}&limit=80&offset=0`
+      `https://wger.de/api/v2/exerciseinfo/?format=json&language=2&category=${catId}&limit=80&offset=0`,
+      { signal: controller.signal }
     );
+    clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP ' + res.status);
+
     const json = await res.json();
 
     const exercises = json.results.map(ex => {
-      // Build names + descriptions map from all available translations
+      // Build names + descriptions keyed by language short code
       const names        = {};
       const descriptions = {};
       for (const tr of (ex.translations || [])) {
@@ -147,27 +171,59 @@ async function fetchCategory(catId) {
           if (d) descriptions[short] = d.slice(0, 300);
         }
       }
-      if (!names.en) return null; // skip if no English name
+      if (!names.en) return null; // skip if no English name at all
+
+      // Muscle names: wger provides name_en; also map localised names where the
+      // API field exists (name_es, name_de, …). Albanian (sq) not provided by
+      // wger so it falls back to English on display.
+      const muscleNames = {};
+      const muscleList  = ex.muscles || [];
+      ['en', 'es', 'de', 'pt'].forEach(lang => {
+        const key = `name_${lang}`;
+        const joined = muscleList.map(m => m[key]).filter(Boolean).join(', ');
+        if (joined) muscleNames[lang] = joined;
+      });
+      // Fallback: always have English
+      if (!muscleNames.en) {
+        muscleNames.en = muscleList.map(m => m.name_en).filter(Boolean).join(', ')
+                      || ex.category?.name || '';
+      }
 
       return {
         id:           ex.id,
         names,
         descriptions,
-        image:        ex.images?.find(i => i.is_main)?.image || ex.images?.[0]?.image || null,
-        allImages:    ex.images?.map(i => i.image).filter(Boolean) || [],
-        muscles:      ex.muscles?.map(m => m.name_en).filter(Boolean).join(', ') || ex.category?.name || '',
+        // Validate all image URLs to https:// before storing
+        image:        safeUrl(ex.images?.find(i => i.is_main)?.image || ex.images?.[0]?.image || ''),
+        allImages:    (ex.images || []).map(i => safeUrl(i.image)).filter(Boolean),
+        muscleNames,  // localised per language
+        muscles:      muscleNames.en, // plain English string kept for backwards compat
       };
     }).filter(Boolean);
 
-    // Sort: exercises with images first (maximises photos shown)
+    // Exercises with photos first — maximises image coverage in each workout
     exercises.sort((a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0));
 
-    localStorage.setItem(CACHE_PFX + catId, JSON.stringify({ data: exercises, ts: Date.now() }));
+    try {
+      localStorage.setItem(CACHE_PFX + catId, JSON.stringify({ data: exercises, ts: Date.now() }));
+    } catch { /* quota exceeded — results used in-memory this session */ }
+
     return exercises;
   } catch (err) {
-    console.warn('API unavailable for category', catId, err);
-    return null;
+    clearTimeout(tid);
+    if (err.name !== 'AbortError') {
+      console.warn('API unavailable for category', catId, err);
+    }
+    return null; // triggers FALLBACK in caller
   }
+}
+
+// Return the best localised muscle string for an exercise
+function exMuscles(ex) {
+  if (ex.muscleNames) {
+    return ex.muscleNames[currentLang] || ex.muscleNames.en || '';
+  }
+  return ex.muscles || ''; // fallback exercises only have a plain string
 }
 
 function shuffle(arr) {
@@ -180,24 +236,23 @@ function shuffle(arr) {
 }
 
 async function loadExercisesForWorkout(wt) {
-  const result = [];
+  const result      = [];
+  const fetchedPool = {}; // keep fetched data to avoid duplicate API calls
 
   for (const cat of wt.categories) {
     const live = await fetchCategory(cat.id);
     const pool = live ?? FALLBACK[cat.id] ?? [];
+    fetchedPool[cat.id] = pool;
 
-    // Separate exercises with/without images, shuffle each group, prefer images
     const withImg    = pool.filter(e => e.image);
     const withoutImg = pool.filter(e => !e.image);
     const ordered    = [...shuffle(withImg), ...shuffle(withoutImg)];
-    const picked     = ordered.slice(0, cat.count);
-    result.push(...picked);
+    result.push(...ordered.slice(0, cat.count));
   }
 
-  // Top up to 8 if still short
+  // Top up to 8 using already-fetched pool (no extra API call)
   if (result.length < 8) {
-    const live = await getCached(wt.categories[0].id);
-    const pool = live ?? FALLBACK[wt.categories[0].id] ?? [];
+    const pool = fetchedPool[wt.categories[0].id] || [];
     for (const ex of pool) {
       if (result.length >= 8) break;
       if (!result.find(e => e.id === ex.id)) result.push(ex);
@@ -217,50 +272,49 @@ function renderHome() {
   const done    = !!todayEntry();
   const history = getHistory();
 
-  // Section labels
   document.querySelector('#view-home .section-label:first-child').textContent = t('todaySuggestion');
   document.querySelector('#view-home .section-label:last-of-type').textContent = t('muscleStatus');
 
-  // Suggestion card
+  // Suggestion card — uses only hardcoded data; sanitize for defence-in-depth
   document.getElementById('suggestion-card').innerHTML = `
     <div class="s-card" style="background:${wt.gradient}">
       <span class="s-emoji">${wt.emoji}</span>
       <div class="s-name">
-        ${wtName(wt)}
-        ${done ? `<span class="done-badge">${t('doneBadge')}</span>` : ''}
+        ${sanitize(wtName(wt))}
+        ${done ? `<span class="done-badge">${sanitize(t('doneBadge'))}</span>` : ''}
       </div>
-      <div class="s-desc">${wtDesc(wt)}</div>
+      <div class="s-desc">${sanitize(wtDesc(wt))}</div>
       <div class="s-tags">
-        ${wtMuscles(wt).map(m => `<span class="s-tag">${m}</span>`).join('')}
-        <span class="s-tag">8 ${t('exercises')}</span>
+        ${wtMuscles(wt).map(m => `<span class="s-tag">${sanitize(m)}</span>`).join('')}
+        <span class="s-tag">8 ${sanitize(t('exercises'))}</span>
       </div>
-      <button class="btn-start" onclick="startWorkout('${wt.id}')">
-        ${done ? t('viewAgain') : t('startWorkout')}
+      <button class="btn-start" onclick="startWorkout('${sanitize(wt.id)}')">
+        ${sanitize(done ? t('viewAgain') : t('startWorkout'))}
       </button>
     </div>
   `;
 
-  // Muscle status rows
+  // Muscle status — uses only hardcoded data
   document.getElementById('muscle-status').innerHTML = WORKOUT_TYPES.map(w => {
     const last = history.filter(h => h.workoutId === w.id)
                         .sort((a, b) => b.date.localeCompare(a.date))[0];
     let label = t('neverDone'), cls = '';
     if (last) {
       const d = daysSince(last.date);
-      if (d === 0)      { label = t('today');     cls = 'fresh';  }
-      else if (d === 1) { label = t('yesterday'); cls = 'medium'; }
-      else              { label = `${d} ${t('dAgo')}`; cls = d <= 2 ? 'medium' : 'ripe'; }
+      if (d === 0)      { label = t('today');                    cls = 'fresh';  }
+      else if (d === 1) { label = t('yesterday');                cls = 'medium'; }
+      else              { label = `${d} ${t('dAgo')}`;          cls = d <= 2 ? 'medium' : 'ripe'; }
     }
     return `
       <div class="status-row">
         <div class="status-left">
           <div class="status-dot" style="background:${w.color}"></div>
           <div>
-            <div class="status-name">${wtName(w)}</div>
-            <div class="status-subs">${wtMuscles(w).join(' · ')}</div>
+            <div class="status-name">${sanitize(wtName(w))}</div>
+            <div class="status-subs">${wtMuscles(w).map(sanitize).join(' · ')}</div>
           </div>
         </div>
-        <div class="status-days ${cls}">${label}</div>
+        <div class="status-days ${cls}">${sanitize(label)}</div>
       </div>
     `;
   }).join('');
@@ -269,35 +323,39 @@ function renderHome() {
 function renderWorkoutHeader(wt) {
   document.getElementById('workout-header').innerHTML = `
     <div class="wkt-header">
-      <h2>${wt.emoji} ${wtName(wt)}</h2>
-      <p>${wtDesc(wt)} · 8 ${t('exercises')}</p>
+      <h2>${wt.emoji} ${sanitize(wtName(wt))}</h2>
+      <p>${sanitize(wtDesc(wt))} · 8 ${sanitize(t('exercises'))}</p>
     </div>
   `;
 }
 
 function renderExercises(exercises, wt, alreadyDone) {
   const grid = document.getElementById('exercise-grid');
+  const btn  = document.getElementById('btn-complete');
 
   if (!exercises.length) {
     grid.innerHTML = `
       <div class="loading-wrap">
-        <div>⚠️ ${t('noConnection')}</div>
+        <div>⚠️ ${sanitize(t('noConnection'))}</div>
       </div>
     `;
     return;
   }
 
   grid.innerHTML = exercises.map((ex, i) => {
-    const icon  = wt.icons[i % 4];
-    const name  = exName(ex);
+    const icon    = wt.icons[i % 4];
+    const name    = sanitize(exName(ex));
+    const muscles = sanitize(exMuscles(ex));
+    const imgUrl  = safeUrl(ex.image || '');
+
     return `
       <div class="ex-card" onclick="openDetail(${i})">
         <div class="ex-img-wrap">
-          ${ex.image
-            ? `<img class="ex-img" src="${ex.image}" alt="${name}" loading="lazy"
+          ${imgUrl
+            ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="lazy"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
             : ''}
-          <div class="ex-placeholder" style="${ex.image ? 'display:none' : ''};background:${wt.gradient}">
+          <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
             <span style="font-size:36px">${icon}</span>
             <span class="ex-placeholder-name">${name}</span>
           </div>
@@ -305,15 +363,16 @@ function renderExercises(exercises, wt, alreadyDone) {
         </div>
         <div class="ex-info">
           <div class="ex-name">${name}</div>
-          <div class="ex-mus">${ex.muscles || ''}</div>
+          <div class="ex-mus">${muscles}</div>
         </div>
       </div>
     `;
   }).join('');
 
-  const btn = document.getElementById('btn-complete');
-  btn.textContent = alreadyDone ? t('completedToday') : t('markComplete');
-  btn.classList.toggle('done', alreadyDone);
+  if (btn) {
+    btn.textContent = alreadyDone ? t('completedToday') : t('markComplete');
+    btn.classList.toggle('done', alreadyDone);
+  }
 }
 
 function renderHistory() {
@@ -325,8 +384,8 @@ function renderHistory() {
     container.innerHTML = `
       <div class="empty-state">
         <div class="big">📝</div>
-        <strong>${t('noHistory')}</strong>
-        <div>${t('noHistoryHint')}</div>
+        <strong>${sanitize(t('noHistory'))}</strong>
+        <div>${sanitize(t('noHistoryHint'))}</div>
       </div>
     `;
     return;
@@ -343,8 +402,8 @@ function renderHistory() {
         <div class="hist-item">
           <div class="hist-bar" style="background:${wt.color}"></div>
           <div class="hist-info">
-            <div class="hist-name">${wtName(wt)}</div>
-            <div class="hist-date">${formatDate(ds)}</div>
+            <div class="hist-name">${sanitize(wtName(wt))}</div>
+            <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
           <div class="hist-icon">${wt.emoji}</div>
         </div>
@@ -354,8 +413,8 @@ function renderHistory() {
         <div class="hist-item">
           <div class="hist-bar" style="background:var(--border)"></div>
           <div class="hist-info">
-            <div class="hist-name rest-day">${t('restDay')}</div>
-            <div class="hist-date">${formatDate(ds)}</div>
+            <div class="hist-name rest-day">${sanitize(t('restDay'))}</div>
+            <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
           <div class="hist-icon">😴</div>
         </div>
@@ -392,15 +451,18 @@ async function startWorkout(workoutId) {
   showView('workout');
   renderWorkoutHeader(wt);
 
-  // Show loading skeleton
   document.getElementById('exercise-grid').innerHTML = `
     <div class="loading-wrap">
       <div class="spinner"></div>
-      <div>${t('loading')}</div>
+      <div>${sanitize(t('loading'))}</div>
     </div>
   `;
-  document.getElementById('btn-complete').textContent = t('markComplete');
-  document.getElementById('btn-complete').classList.remove('done');
+
+  const btn = document.getElementById('btn-complete');
+  if (btn) {
+    btn.textContent = t('markComplete');
+    btn.classList.remove('done');
+  }
 
   const exercises     = await loadExercisesForWorkout(wt);
   activeWorkout.exercises = exercises;
@@ -412,7 +474,7 @@ async function startWorkout(workoutId) {
 function completeWorkout() {
   if (!activeWorkout) return;
   const btn = document.getElementById('btn-complete');
-  if (btn.classList.contains('done')) return;
+  if (!btn || btn.classList.contains('done')) return;
 
   const { type } = activeWorkout;
   addToHistory(type.id, wtName(type));
@@ -428,30 +490,77 @@ function openDetail(index) {
   const ex = activeWorkout.exercises[index];
   if (!ex) return;
 
-  const name = exName(ex);
-  const desc = exDesc(ex);
-  // Show first available image; if main fails show second image
-  const imgs = ex.allImages || (ex.image ? [ex.image] : []);
+  const name    = exName(ex);
+  const muscles = exMuscles(ex);
+  const desc    = exDesc(ex);
+  const imgs    = ex.allImages || (ex.image ? [ex.image] : []);
 
-  const el = document.createElement('div');
-  el.className = 'modal-bg';
-  el.innerHTML = `
-    <div class="modal-box">
-      <button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button>
-      ${imgs.length
-        ? `<img class="modal-img" src="${imgs[0]}" alt="${name}"
-             onerror="this.src='${imgs[1] || ''}'; this.onerror=null">`
-        : `<div class="modal-img-placeholder" style="background:${activeWorkout.type.gradient}">
-             ${activeWorkout.type.emoji}
-           </div>`
+  // Build modal with DOM API to avoid any innerHTML injection risk for dynamic content
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '✕';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  box.appendChild(closeBtn);
+
+  // Image (or placeholder)
+  if (imgs.length && safeUrl(imgs[0])) {
+    const img = document.createElement('img');
+    img.className = 'modal-img';
+    img.alt = name;
+    img.loading = 'lazy';
+    // If primary image fails, try the second one; then give up
+    let fallbackIdx = 1;
+    img.addEventListener('error', () => {
+      const next = safeUrl(imgs[fallbackIdx] || '');
+      if (next && fallbackIdx < imgs.length) {
+        fallbackIdx++;
+        img.src = next;
+      } else {
+        img.style.display = 'none';
       }
-      <div class="modal-title">${name}</div>
-      <div class="modal-mus">${ex.muscles || ''}</div>
-      ${desc ? `<div class="modal-desc">${desc}</div>` : ''}
-    </div>
-  `;
-  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
-  document.body.appendChild(el);
+    });
+    img.src = safeUrl(imgs[0]);
+    box.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'modal-img-placeholder';
+    ph.style.background = activeWorkout.type.gradient;
+    ph.textContent = activeWorkout.type.emoji;
+    box.appendChild(ph);
+  }
+
+  // Title
+  const title = document.createElement('div');
+  title.className = 'modal-title';
+  title.textContent = name;
+  box.appendChild(title);
+
+  // Muscles
+  if (muscles) {
+    const mus = document.createElement('div');
+    mus.className = 'modal-mus';
+    mus.textContent = muscles;
+    box.appendChild(mus);
+  }
+
+  // Description
+  if (desc) {
+    const d = document.createElement('div');
+    d.className = 'modal-desc';
+    d.textContent = desc;
+    box.appendChild(d);
+  }
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -459,7 +568,7 @@ function openDetail(index) {
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';
-  el.textContent = msg;
+  el.textContent = msg; // textContent — never innerHTML
   document.body.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); }, 2800);
@@ -468,7 +577,6 @@ function toast(msg) {
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Restore saved language
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === currentLang)
   );
