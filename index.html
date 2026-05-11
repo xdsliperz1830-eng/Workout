@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#0F0F0F">
+  <link rel="manifest" href="manifest.json">
+  <title>Muscle Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header class="app-header">
+      <div class="header-left">
+        <span class="header-icon">💪</span>
+        <div>
+          <h1>Muscle Tracker</h1>
+          <p id="header-date"></p>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+
+      <!-- Home View -->
+      <section id="view-home" class="view">
+        <div class="section-label">TODAY'S SUGGESTION</div>
+        <div id="suggestion-card"></div>
+
+        <div class="section-label" style="margin-top:24px">MUSCLE STATUS</div>
+        <div id="muscle-status"></div>
+      </section>
+
+      <!-- Workout View -->
+      <section id="view-workout" class="view hidden">
+        <div id="workout-header"></div>
+        <div id="exercise-grid" class="exercise-grid"></div>
+        <div class="complete-wrap">
+          <button id="btn-complete" class="btn-complete" onclick="completeWorkout()">
+            ✓ Mark Workout Complete
+          </button>
+        </div>
+      </section>
+
+      <!-- History View -->
+      <section id="view-history" class="view hidden">
+        <div class="section-label">WORKOUT HISTORY</div>
+        <div id="history-list"></div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="home" onclick="showView('home')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-view="workout" onclick="showView('workout')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>
+        <span>Workout</span>
+      </button>
+      <button class="nav-btn" data-view="history" onclick="showView('history')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        <span>History</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
