@@ -9,7 +9,7 @@ const LANGUAGES = {
 const UI = {
   en: {
     todaySuggestion: "TODAY'S SUGGESTION",
-    muscleStatus:    'MUSCLE STATUS',
+    muscleStatus:    'MUSCLE STATUS — tap to start',
     workoutHistory:  'WORKOUT HISTORY',
     startWorkout:    '▶ Start Workout',
     viewAgain:       '▶ View Again',
@@ -33,10 +33,14 @@ const UI = {
     reps:            'Reps',
     rest:            'Rest',
     sec:             'sec',
+    clearHistory:    'Clear History',
+    clearConfirmMsg: 'Clear all workout history?',
+    cancel:          'Cancel',
+    clearAll:        'Clear All',
   },
   sq: {
     todaySuggestion: 'SUGJERIMI I SOTËM',
-    muscleStatus:    'GJENDJA E MUSKUJVE',
+    muscleStatus:    'GJENDJA E MUSKUJVE — trokitni për të nisur',
     workoutHistory:  'HISTORIA E STËRVITJES',
     startWorkout:    '▶ Fillo Stërvitjen',
     viewAgain:       '▶ Shiko Përsëri',
@@ -60,10 +64,14 @@ const UI = {
     reps:            'Rep',
     rest:            'Pushim',
     sec:             'sek',
+    clearHistory:    'Pastro Historinë',
+    clearConfirmMsg: 'Fshi të gjithë historinë e stërvitjes?',
+    cancel:          'Anulo',
+    clearAll:        'Fshi të Gjitha',
   },
   es: {
     todaySuggestion: 'SUGERENCIA DE HOY',
-    muscleStatus:    'ESTADO MUSCULAR',
+    muscleStatus:    'ESTADO MUSCULAR — toca para empezar',
     workoutHistory:  'HISTORIAL',
     startWorkout:    '▶ Iniciar Entrenamiento',
     viewAgain:       '▶ Ver de Nuevo',
@@ -87,6 +95,10 @@ const UI = {
     reps:            'Reps',
     rest:            'Descanso',
     sec:             'seg',
+    clearHistory:    'Borrar Historial',
+    clearConfirmMsg: '¿Borrar todo el historial de entrenamientos?',
+    cancel:          'Cancelar',
+    clearAll:        'Borrar Todo',
   },
 };
 

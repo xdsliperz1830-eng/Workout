@@ -399,7 +399,7 @@ function renderHome() {
       else              { label = `${d} ${t('dAgo')}`;          cls = d <= 2 ? 'medium' : 'ripe'; }
     }
     return `
-      <div class="status-row">
+      <div class="status-row" onclick="startWorkout('${w.id}')">
         <div class="status-left">
           <div class="status-dot" style="background:${w.color}"></div>
           <div>
@@ -407,7 +407,10 @@ function renderHome() {
             <div class="status-subs">${wtMuscles(w).map(sanitize).join(' · ')}</div>
           </div>
         </div>
-        <div class="status-days ${cls}">${sanitize(label)}</div>
+        <div class="status-right">
+          <span class="status-days ${cls}">${sanitize(label)}</span>
+          <span class="status-chevron">›</span>
+        </div>
       </div>
     `;
   }).join('');
@@ -447,8 +450,20 @@ function renderHistory() {
   document.getElementById('label-history').textContent = t('workoutHistory');
   const history   = getHistory();
   const container = document.getElementById('history-list');
+  const clearBtn  = document.getElementById('btn-clear-history');
+  const confirmEl = document.getElementById('hist-confirm');
+
+  // Update localised button labels
+  document.getElementById('btn-clear-label').textContent  = t('clearHistory');
+  document.getElementById('hist-confirm-msg').textContent = t('clearConfirmMsg');
+  document.getElementById('btn-cancel-clear').textContent = t('cancel');
+  document.getElementById('btn-do-clear').textContent     = t('clearAll');
+
+  // Reset confirm banner whenever history re-renders
+  if (confirmEl) confirmEl.classList.add('hidden');
 
   if (!history.length) {
+    if (clearBtn) clearBtn.style.display = 'none';
     container.innerHTML = `
       <div class="empty-state">
         <div class="big">📝</div>
@@ -459,11 +474,16 @@ function renderHistory() {
     return;
   }
 
+  if (clearBtn) clearBtn.style.display = '';
+
+  // Only show days that have at least one real workout in the window
+  const earliest = history[history.length - 1]?.date;
   const rows = [];
   for (let i = 0; i < 21; i++) {
     const d  = new Date();
     d.setDate(d.getDate() - i);
     const ds = localDateStr(d);
+    if (earliest && ds < earliest) break; // don't pad rest days before first ever workout
     const entry = history.find(h => h.date === ds);
     const wt    = entry ? WORKOUT_TYPES.find(w => w.id === entry.workoutId) : null;
 
@@ -492,6 +512,25 @@ function renderHistory() {
     }
   }
   container.innerHTML = rows.join('');
+}
+
+function promptClearHistory() {
+  const confirmEl = document.getElementById('hist-confirm');
+  if (confirmEl) confirmEl.classList.remove('hidden');
+  const clearBtn = document.getElementById('btn-clear-history');
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+
+function cancelClearHistory() {
+  const confirmEl = document.getElementById('hist-confirm');
+  if (confirmEl) confirmEl.classList.add('hidden');
+  const clearBtn = document.getElementById('btn-clear-history');
+  if (clearBtn) clearBtn.style.display = '';
+}
+
+function doClearHistory() {
+  try { localStorage.removeItem(HISTORY_KEY); } catch {}
+  renderHistory();
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────

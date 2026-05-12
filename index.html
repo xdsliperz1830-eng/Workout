@@ -53,7 +53,20 @@
 
       <!-- History View -->
       <section id="view-history" class="view hidden">
-        <div id="label-history" class="section-label">WORKOUT HISTORY</div>
+        <div class="hist-header-row">
+          <div id="label-history" class="section-label">WORKOUT HISTORY</div>
+          <button id="btn-clear-history" class="btn-clear-history" onclick="promptClearHistory()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span id="btn-clear-label"></span>
+          </button>
+        </div>
+        <div id="hist-confirm" class="hist-confirm hidden">
+          <span id="hist-confirm-msg" class="clear-msg"></span>
+          <div class="clear-btns">
+            <button class="btn-cancel" onclick="cancelClearHistory()" id="btn-cancel-clear"></button>
+            <button class="btn-confirm-clear" onclick="doClearHistory()" id="btn-do-clear"></button>
+          </div>
+        </div>
         <div id="history-list"></div>
       </section>
 

@@ -204,12 +204,20 @@ body {
   border-radius: 10px;
   padding: 11px 12px;
   margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--t), opacity var(--t);
 }
-.status-left  { display: flex; align-items: center; gap: 10px; }
+.status-row:active { transform: scale(.98); opacity: .75; }
+
+.status-left  { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .status-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .status-name  { font-size: 14px; font-weight: 600; }
 .status-subs  { font-size: 11px; color: var(--text2); margin-top: 1px; }
-.status-days  { font-size: 12px; color: var(--text2); flex-shrink: 0; margin-left: 8px; }
+
+.status-right   { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: 8px; }
+.status-days    { font-size: 12px; color: var(--text2); }
+.status-chevron { font-size: 20px; font-weight: 300; color: var(--text2); line-height: 1; }
 .status-days.ripe   { color: #E74C3C; }
 .status-days.medium { color: #F39C12; }
 .status-days.fresh  { color: #2ECC71; }
@@ -354,6 +362,79 @@ body {
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── History header & clear controls ───────────── */
+
+.hist-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.hist-header-row .section-label { margin-bottom: 0; }
+
+.btn-clear-history {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: var(--t);
+  flex-shrink: 0;
+}
+.btn-clear-history:active { background: #3A1A1A; color: #E74C3C; }
+
+.hist-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.hist-confirm.hidden { display: none !important; }
+
+.clear-msg {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.clear-btns { display: flex; gap: 6px; flex-shrink: 0; }
+
+.btn-cancel {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: var(--t);
+}
+.btn-cancel:active { opacity: .7; }
+
+.btn-confirm-clear {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #C0392B;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: var(--t);
+}
+.btn-confirm-clear:active { opacity: .8; }
 
 /* ─── History ────────────────────────────────────── */
 
