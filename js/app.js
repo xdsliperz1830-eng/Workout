@@ -251,31 +251,50 @@ function shuffle(arr) {
 }
 
 async function loadExercisesForWorkout(wt) {
-  const result      = [];
-  const fetchedPool = {}; // keep fetched data to avoid duplicate API calls
+  const result    = [];
+  const fullPool  = {}; // complete pool per catId — kept on activeWorkout for refresh
 
   for (const cat of wt.categories) {
     const live = await fetchCategory(cat.id);
-    // ?? only catches null/undefined — also fall back when API returned []
     const pool = (live && live.length > 0) ? live : (FALLBACK[cat.id] ?? []);
-    fetchedPool[cat.id] = pool;
+    fullPool[cat.id] = pool;
 
     const withImg    = pool.filter(e => e.image);
     const withoutImg = pool.filter(e => !e.image);
     const ordered    = [...shuffle(withImg), ...shuffle(withoutImg)];
-    result.push(...ordered.slice(0, cat.count));
+    // Tag each exercise with its source category so refresh knows where to look
+    ordered.slice(0, cat.count).forEach(ex => result.push({ ...ex, catId: cat.id }));
   }
 
-  // Top up to 8 using already-fetched pool (no extra API call)
+  // Top up to 8 from the first category's pool (no extra API call)
   if (result.length < 8) {
-    const pool = fetchedPool[wt.categories[0].id] || [];
-    for (const ex of pool) {
+    const firstCat = wt.categories[0];
+    for (const ex of (fullPool[firstCat.id] || [])) {
       if (result.length >= 8) break;
-      if (!result.find(e => e.id === ex.id)) result.push(ex);
+      if (!result.find(e => e.id === ex.id)) result.push({ ...ex, catId: firstCat.id });
     }
   }
 
+  if (activeWorkout) activeWorkout.pool = fullPool;
   return result.slice(0, 8);
+}
+
+function refreshExercise(index) {
+  if (!activeWorkout) return;
+  const ex = activeWorkout.exercises[index];
+  if (!ex) return;
+
+  const catId = ex.catId;
+  const pool  = (activeWorkout.pool || {})[catId] || [];
+  const usedIds = new Set(activeWorkout.exercises.map(e => e.id));
+  const candidates = pool.filter(e => !usedIds.has(e.id));
+  if (!candidates.length) return; // pool exhausted — nothing to swap
+
+  const next = candidates[Math.floor(Math.random() * candidates.length)];
+  activeWorkout.exercises[index] = { ...next, catId };
+
+  const done = todayEntry()?.workoutId === activeWorkout.type.id;
+  renderExercises(activeWorkout.exercises, activeWorkout.type, done);
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
@@ -378,6 +397,9 @@ function renderExercises(exercises, wt, alreadyDone) {
             <span class="ex-placeholder-name">${name}</span>
           </div>
           <div class="ex-num">${i + 1}</div>
+          <button class="ex-refresh" onclick="event.stopPropagation();refreshExercise(${i})" aria-label="Swap exercise">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>
         </div>
         <div class="ex-info">
           <div class="ex-name">${name}</div>
