@@ -28,6 +28,9 @@ function safeUrl(url) {
 
 // ─── i18n helpers ─────────────────────────────────────────────────────────────
 
+// Map app language → BCP-47 locale for date/number formatting
+const LOCALE_FOR = { en: 'en-US', es: 'es-ES', sq: 'sq-AL' };
+
 function t(key) {
   return (UI[currentLang] || UI.en)[key] || UI.en[key] || key;
 }
@@ -53,6 +56,8 @@ function setLang(code) {
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === code)
   );
+
+  renderHeaderDate();
 
   if (currentView === 'home')    renderHome();
   if (currentView === 'history') renderHistory();
@@ -81,27 +86,41 @@ function getHistory() {
   catch { return []; }
 }
 
-function addToHistory(workoutId, workoutName) {
+function addToHistory(workoutId) {
   const history = getHistory().filter(h => h.date !== todayStr());
-  history.unshift({ date: todayStr(), workoutId, workoutName });
+  history.unshift({ date: todayStr(), workoutId });
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 90))); }
   catch { /* storage quota exceeded — history won't persist this session */ }
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// Returns YYYY-MM-DD in the device's local timezone (not UTC)
+function localDateStr(date) {
+  const d = date || new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function todayStr() { return localDateStr(); }
 
 function daysSince(dateStr) {
   return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86400000);
 }
 
 function formatDate(dateStr) {
-  const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yest = localDateStr(yesterday);
   if (dateStr === todayStr()) return t('today');
   if (dateStr === yest)       return t('yesterday');
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US',
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US',
     { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function renderHeaderDate() {
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US',
+      { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
 // ─── Suggestion algorithm ─────────────────────────────────────────────────────
@@ -126,7 +145,7 @@ function getSuggestion() {
 
 // ─── API / caching ────────────────────────────────────────────────────────────
 
-async function getCached(catId) {
+function getCached(catId) {
   try {
     const raw = localStorage.getItem(CACHE_PFX + catId);
     if (raw) {
@@ -142,7 +161,7 @@ function stripHtml(html) {
 }
 
 async function fetchCategory(catId) {
-  const cached = await getCached(catId);
+  const cached = getCached(catId);
   if (cached) return cached;
 
   // Abort after 10 s to avoid hanging indefinitely
@@ -284,25 +303,64 @@ function refreshExercise(index) {
   const ex = activeWorkout.exercises[index];
   if (!ex) return;
 
-  const catId = ex.catId;
-  const pool  = (activeWorkout.pool || {})[catId] || [];
-  const usedIds = new Set(activeWorkout.exercises.map(e => e.id));
+  const catId    = ex.catId;
+  const pool     = (activeWorkout.pool || {})[catId] || [];
+  const usedIds  = new Set(activeWorkout.exercises.map(e => e.id));
   const candidates = pool.filter(e => !usedIds.has(e.id));
-  if (!candidates.length) return; // pool exhausted — nothing to swap
+  if (!candidates.length) return;
 
   const next = candidates[Math.floor(Math.random() * candidates.length)];
   activeWorkout.exercises[index] = { ...next, catId };
 
-  const done = todayEntry()?.workoutId === activeWorkout.type.id;
-  renderExercises(activeWorkout.exercises, activeWorkout.type, done);
+  // Replace only the one card — avoids image flicker on the other 7
+  const cards = document.getElementById('exercise-grid').querySelectorAll('.ex-card');
+  if (cards[index]) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderCard(activeWorkout.exercises[index], index, activeWorkout.type);
+    cards[index].replaceWith(tmp.firstElementChild);
+  }
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
-function renderHome() {
-  document.getElementById('header-date').textContent =
-    new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+function renderCard(ex, i, wt) {
+  const icon    = wt.icons[i % 4];
+  const name    = sanitize(exName(ex));
+  const muscles = sanitize(exMuscles(ex));
+  const imgUrl  = safeUrl(ex.image || '');
+  const proto   = ex.proto || wt.defaultProto;
+  const protoStr = proto ? `${proto.sets}×${proto.reps}` : '';
 
+  const pool       = (activeWorkout?.pool || {})[ex.catId] || [];
+  const usedIds    = new Set((activeWorkout?.exercises || []).map(e => e.id));
+  const canRefresh = pool.some(e => !usedIds.has(e.id));
+
+  return `
+    <div class="ex-card" onclick="openDetail(${i})">
+      <div class="ex-img-wrap">
+        ${imgUrl
+          ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : ''}
+        <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
+          <span style="font-size:36px">${icon}</span>
+          <span class="ex-placeholder-name">${name}</span>
+        </div>
+        <div class="ex-num">${i + 1}</div>
+        ${canRefresh ? `<button class="ex-refresh" onclick="event.stopPropagation();refreshExercise(${i})" aria-label="Swap exercise">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>` : ''}
+      </div>
+      <div class="ex-info">
+        <div class="ex-name">${name}</div>
+        <div class="ex-mus">${muscles}</div>
+        ${protoStr ? `<div class="ex-proto">${protoStr}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderHome() {
   const wt      = getSuggestion();
   const done    = !!todayEntry();
   const history = getHistory();
@@ -377,38 +435,7 @@ function renderExercises(exercises, wt, alreadyDone) {
     return;
   }
 
-  grid.innerHTML = exercises.map((ex, i) => {
-    const icon    = wt.icons[i % 4];
-    const name    = sanitize(exName(ex));
-    const muscles = sanitize(exMuscles(ex));
-    const imgUrl  = safeUrl(ex.image || '');
-    const proto   = ex.proto || wt.defaultProto;
-    const protoStr = proto ? `${proto.sets}×${proto.reps}` : '';
-
-    return `
-      <div class="ex-card" onclick="openDetail(${i})">
-        <div class="ex-img-wrap">
-          ${imgUrl
-            ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="lazy"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : ''}
-          <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
-            <span style="font-size:36px">${icon}</span>
-            <span class="ex-placeholder-name">${name}</span>
-          </div>
-          <div class="ex-num">${i + 1}</div>
-          <button class="ex-refresh" onclick="event.stopPropagation();refreshExercise(${i})" aria-label="Swap exercise">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-          </button>
-        </div>
-        <div class="ex-info">
-          <div class="ex-name">${name}</div>
-          <div class="ex-mus">${muscles}</div>
-          ${protoStr ? `<div class="ex-proto">${protoStr}</div>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
+  grid.innerHTML = exercises.map((ex, i) => renderCard(ex, i, wt)).join('');
 
   if (btn) {
     btn.textContent = alreadyDone ? t('completedToday') : t('markComplete');
@@ -434,7 +461,9 @@ function renderHistory() {
 
   const rows = [];
   for (let i = 0; i < 21; i++) {
-    const ds    = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const d  = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = localDateStr(d);
     const entry = history.find(h => h.date === ds);
     const wt    = entry ? WORKOUT_TYPES.find(w => w.id === entry.workoutId) : null;
 
@@ -488,7 +517,8 @@ async function startWorkout(workoutId) {
   const wt = WORKOUT_TYPES.find(w => w.id === workoutId);
   if (!wt) return;
 
-  activeWorkout = { type: wt, exercises: [] };
+  const myWorkout = { type: wt, exercises: [] };
+  activeWorkout = myWorkout;
   showView('workout');
   renderWorkoutHeader(wt);
 
@@ -505,9 +535,12 @@ async function startWorkout(workoutId) {
     btn.classList.remove('done');
   }
 
-  const exercises     = await loadExercisesForWorkout(wt);
-  activeWorkout.exercises = exercises;
+  const exercises = await loadExercisesForWorkout(wt);
 
+  // Guard: user may have tapped a different workout while this one was loading
+  if (activeWorkout !== myWorkout) return;
+
+  activeWorkout.exercises = exercises;
   const done = todayEntry()?.workoutId === workoutId;
   renderExercises(exercises, wt, done);
 }
@@ -518,7 +551,7 @@ function completeWorkout() {
   if (!btn || btn.classList.contains('done')) return;
 
   const { type } = activeWorkout;
-  addToHistory(type.id, wtName(type));
+  addToHistory(type.id);
   btn.textContent = t('completedToday');
   btn.classList.add('done');
   toast(`${type.emoji} ${wtName(type)}`);
@@ -539,6 +572,15 @@ function openDetail(index) {
   // Build modal with DOM API to avoid any innerHTML injection risk for dynamic content
   const overlay = document.createElement('div');
   overlay.className = 'modal-bg';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
 
   const box = document.createElement('div');
   box.className = 'modal-box';
@@ -547,7 +589,8 @@ function openDetail(index) {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'modal-close';
   closeBtn.textContent = '✕';
-  closeBtn.addEventListener('click', () => overlay.remove());
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.addEventListener('click', close);
   box.appendChild(closeBtn);
 
   // Image (or placeholder)
@@ -624,7 +667,7 @@ function openDetail(index) {
   }
 
   overlay.appendChild(box);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   document.body.appendChild(overlay);
 }
 
@@ -659,6 +702,7 @@ function init() {
     b.classList.toggle('active', b.dataset.lang === currentLang)
   );
   updateNavLabels();
+  renderHeaderDate();
   renderHome();
 }
 
