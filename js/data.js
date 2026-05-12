@@ -106,6 +106,51 @@ const UI = {
 const IMG = (name, idx = 0) =>
   `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${name}/${idx}.jpg`;
 
+// Localised muscle-name lookup for FALLBACK exercises (which store a plain English string).
+// Keys are the exact English strings used in the `muscles` field below.
+const MUSCLE_NAMES = {
+  'Chest':                   { sq: 'Gjoks',                                es: 'Pecho' },
+  'Upper chest':             { sq: 'Gjoks i sipërm',                       es: 'Pecho superior' },
+  'Lower chest':             { sq: 'Gjoks i poshtëm',                      es: 'Pecho inferior' },
+  'Chest, Triceps':          { sq: 'Gjoks, Triceps',                       es: 'Pecho, Tríceps' },
+  'Chest, Lats':             { sq: 'Gjoks, Dorsali',                       es: 'Pecho, Dorsales' },
+  'Lats':                    { sq: 'Dorsali i gjerë',                      es: 'Dorsales' },
+  'Lats, Rhomboids':         { sq: 'Dorsali, Romboidet',                   es: 'Dorsales, Romboides' },
+  'Lats, Biceps':            { sq: 'Dorsali, Biceps',                      es: 'Dorsales, Bíceps' },
+  'Latissimus dorsi':        { sq: 'Dorsali i gjerë',                      es: 'Dorsal ancho' },
+  'Lats, Erector spine':     { sq: 'Dorsali, Erektori spinal',             es: 'Dorsales, Erector espinal' },
+  'Lats, Core':              { sq: 'Dorsali, Bërthamë',                    es: 'Dorsales, Core' },
+  'Rhomboids, Lats':         { sq: 'Romboidet, Dorsali',                   es: 'Romboides, Dorsales' },
+  'Rear delts, Traps':       { sq: 'Deltoid i pasëm, Trapezoid',           es: 'Deltoides posterior, Trapecios' },
+  'Deltoid':                 { sq: 'Deltoid',                              es: 'Deltoides' },
+  'Deltoid (lateral)':       { sq: 'Deltoid anësor',                       es: 'Deltoides lateral' },
+  'Deltoid (anterior)':      { sq: 'Deltoid anterior',                     es: 'Deltoides anterior' },
+  'Deltoid (posterior)':     { sq: 'Deltoid posterior',                    es: 'Deltoides posterior' },
+  'Deltoid (all heads)':     { sq: 'Deltoid (të gjitha kokat)',             es: 'Deltoides (todas las cabezas)' },
+  'Deltoid, Trapezius':      { sq: 'Deltoid, Trapezoid',                   es: 'Deltoides, Trapecio' },
+  'Trapezius':               { sq: 'Trapezoid',                            es: 'Trapecio' },
+  'Quads, Glutes':           { sq: 'Kuadriceps, Gluteus',                  es: 'Cuádriceps, Glúteos' },
+  'Quadriceps':              { sq: 'Kuadriceps',                           es: 'Cuádriceps' },
+  'Hamstrings, Glutes':      { sq: 'Biceps femoral, Gluteus',              es: 'Isquiotibiales, Glúteos' },
+  'Hamstrings':              { sq: 'Biceps femoral',                       es: 'Isquiotibiales' },
+  'Hamstrings, Lower back':  { sq: 'Biceps femoral, Shpina e poshtme',     es: 'Isquiotibiales, Espalda baja' },
+  'Glutes':                  { sq: 'Gluteus',                              es: 'Glúteos' },
+  'Gastrocnemius':           { sq: 'Gastroknemius',                        es: 'Gastrocnemio' },
+  'Soleus':                  { sq: 'Soleus',                               es: 'Sóleo' },
+  'Biceps':                  { sq: 'Biceps',                               es: 'Bíceps' },
+  'Brachialis, Biceps':      { sq: 'Brahialis, Biceps',                    es: 'Braquial, Bíceps' },
+  'Biceps (long head)':      { sq: 'Biceps (koka e gjatë)',                es: 'Bíceps (cabeza larga)' },
+  'Triceps':                 { sq: 'Triceps',                              es: 'Tríceps' },
+  'Triceps, Chest':          { sq: 'Triceps, Gjoks',                       es: 'Tríceps, Pecho' },
+  'Rectus abdominis':        { sq: 'Muskuli drejt i barkut',               es: 'Recto abdominal' },
+  'Core':                    { sq: 'Bërthamë',                             es: 'Core' },
+  'Lower abs, Hip flex':     { sq: 'Abdominale i poshtëm, Fleksues i ijeve', es: 'Abdominales inferiores, Flexores de cadera' },
+  'Obliques':                { sq: 'Obliku',                               es: 'Oblicuos' },
+  'Obliques, Abs':           { sq: 'Obliku, Abdominale',                   es: 'Oblicuos, Abdominales' },
+  'Core, Hip flexors':       { sq: 'Bërthamë, Fleksues i ijeve',           es: 'Core, Flexores de cadera' },
+  'Lower abs':               { sq: 'Abdominale i poshtëm',                 es: 'Abdominales inferiores' },
+};
+
 // wger category IDs: 8=Arms 9=Legs 10=Abs 11=Chest 12=Back 13=Shoulders 14=Calves
 const WORKOUT_TYPES = [
   {

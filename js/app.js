@@ -79,7 +79,7 @@ function updateNavLabels() {
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const HISTORY_KEY = 'mtracker_history_v1';
-const CACHE_PFX   = 'mtracker_cache_v2_';
+const CACHE_PFX   = 'mtracker_cache_v3_'; // bumped: old v2 cache had imageless API exercises
 
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
@@ -257,7 +257,12 @@ function exMuscles(ex) {
   if (ex.muscleNames) {
     return ex.muscleNames[currentLang] || ex.muscleNames.en || '';
   }
-  return ex.muscles || ''; // fallback exercises only have a plain string
+  // FALLBACK exercises store a plain English string — translate via lookup table
+  const raw = ex.muscles || '';
+  if (currentLang !== 'en' && MUSCLE_NAMES[raw]) {
+    return MUSCLE_NAMES[raw][currentLang] || raw;
+  }
+  return raw;
 }
 
 function shuffle(arr) {
@@ -270,22 +275,27 @@ function shuffle(arr) {
 }
 
 async function loadExercisesForWorkout(wt) {
-  const result    = [];
-  const fullPool  = {}; // complete pool per catId — kept on activeWorkout for refresh
+  const result   = [];
+  const fullPool = {};
 
   for (const cat of wt.categories) {
-    const live = await fetchCategory(cat.id);
-    const pool = (live && live.length > 0) ? live : (FALLBACK[cat.id] ?? []);
+    // FALLBACK is the guaranteed image source — always included
+    const fallback     = FALLBACK[cat.id] ?? [];
+    const fallbackIds  = new Set(fallback.map(e => e.id));
+
+    // Supplement with API exercises that actually carry an image (wger has sparse coverage)
+    const live         = await fetchCategory(cat.id);
+    const liveWithImg  = live ? live.filter(e => e.image) : [];
+    const extras       = liveWithImg.filter(e => !fallbackIds.has(e.id));
+
+    // Pool = all FALLBACK (verified images) + any API exercises with images
+    const pool = [...fallback, ...extras];
     fullPool[cat.id] = pool;
 
-    const withImg    = pool.filter(e => e.image);
-    const withoutImg = pool.filter(e => !e.image);
-    const ordered    = [...shuffle(withImg), ...shuffle(withoutImg)];
-    // Tag each exercise with its source category so refresh knows where to look
-    ordered.slice(0, cat.count).forEach(ex => result.push({ ...ex, catId: cat.id }));
+    shuffle(pool).slice(0, cat.count).forEach(ex => result.push({ ...ex, catId: cat.id }));
   }
 
-  // Top up to 8 from the first category's pool (no extra API call)
+  // Top up to 8 from the first category's pool if needed
   if (result.length < 8) {
     const firstCat = wt.categories[0];
     for (const ex of (fullPool[firstCat.id] || [])) {
@@ -339,7 +349,7 @@ function renderCard(ex, i, wt) {
     <div class="ex-card" onclick="openDetail(${i})">
       <div class="ex-img-wrap">
         ${imgUrl
-          ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="lazy"
+          ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="eager"
                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
           : ''}
         <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
