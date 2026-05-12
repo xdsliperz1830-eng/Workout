@@ -51,6 +51,7 @@ function exDesc(ex) {
 function setLang(code) {
   if (!LANGUAGES[code]) return;
   currentLang = code;
+  document.documentElement.lang = code;
   try { localStorage.setItem('mtracker_lang', code); } catch { /* quota full — continue */ }
 
   document.querySelectorAll('.lang-btn').forEach(b =>
@@ -129,14 +130,14 @@ function todayEntry() {
   return getHistory().find(h => h.date === todayStr()) || null;
 }
 
-function getSuggestion() {
-  const history = getHistory();
-  const done    = todayEntry();
-  if (done) return WORKOUT_TYPES.find(w => w.id === done.workoutId) || WORKOUT_TYPES[0];
+function getSuggestion(history) {
+  const hist     = history || getHistory();
+  const todayEnt = hist.find(h => h.date === todayStr()) || null;
+  if (todayEnt) return WORKOUT_TYPES.find(w => w.id === todayEnt.workoutId) || WORKOUT_TYPES[0];
 
   const scored = WORKOUT_TYPES.map(wt => {
-    const last = history.filter(h => h.workoutId === wt.id)
-                        .sort((a, b) => b.date.localeCompare(a.date))[0];
+    const last = hist.filter(h => h.workoutId === wt.id)
+                     .sort((a, b) => b.date.localeCompare(a.date))[0];
     return { wt, score: last ? daysSince(last.date) : 999 };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -164,9 +165,8 @@ async function fetchCategory(catId) {
   const cached = getCached(catId);
   if (cached) return cached;
 
-  // Abort after 10 s to avoid hanging indefinitely
   const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), 10000);
+  const tid = setTimeout(() => controller.abort(), 6000);
 
   try {
     const res = await fetch(
@@ -235,14 +235,13 @@ async function fetchCategory(catId) {
       };
     }).filter(Boolean);
 
-    // Exercises with photos first — maximises image coverage in each workout
-    exercises.sort((a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0));
-
+    // Cache and return only exercises with images — saves localStorage quota
+    const withImages = exercises.filter(e => e.image);
     try {
-      localStorage.setItem(CACHE_PFX + catId, JSON.stringify({ data: exercises, ts: Date.now() }));
+      localStorage.setItem(CACHE_PFX + catId, JSON.stringify({ data: withImages, ts: Date.now() }));
     } catch { /* quota exceeded — results used in-memory this session */ }
 
-    return exercises;
+    return withImages;
   } catch (err) {
     clearTimeout(tid);
     if (err.name !== 'AbortError') {
@@ -371,9 +370,10 @@ function renderCard(ex, i, wt) {
 }
 
 function renderHome() {
-  const wt      = getSuggestion();
-  const done    = !!todayEntry();
-  const history = getHistory();
+  const history  = getHistory();
+  const todayEnt = history.find(h => h.date === todayStr()) || null;
+  const wt       = getSuggestion(history);
+  const done     = !!todayEnt;
 
   document.getElementById('label-today').textContent  = t('todaySuggestion');
   document.getElementById('label-status').textContent = t('muscleStatus');
@@ -409,7 +409,7 @@ function renderHome() {
       else              { label = `${d} ${t('dAgo')}`;          cls = d <= 2 ? 'medium' : 'ripe'; }
     }
     return `
-      <div class="status-row" onclick="startWorkout('${w.id}')">
+      <div class="status-row" onclick="startWorkout('${sanitize(w.id)}')">
         <div class="status-left">
           <div class="status-dot" style="background:${w.color}"></div>
           <div>
@@ -610,6 +610,7 @@ function completeWorkout() {
 
 function openDetail(index) {
   if (!activeWorkout) return;
+  if (document.querySelector('.modal-bg')) return;
   const ex = activeWorkout.exercises[index];
   if (!ex) return;
 
@@ -743,6 +744,16 @@ function setAppHeight() {
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
 function init() {
+  document.documentElement.lang = currentLang;
+
+  // Remove stale cache entries from older app versions
+  ['v1', 'v2'].forEach(v => {
+    const pfx = `mtracker_cache_${v}_`;
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith(pfx)).forEach(k => localStorage.removeItem(k));
+    } catch {}
+  });
+
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
