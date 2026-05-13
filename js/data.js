@@ -39,6 +39,7 @@ const UI = {
     clearAll:        'Clear All',
     logFor:          'Log workout for',
     changeWorkout:   'Change',
+    selectDay:       'Select a Day',
   },
   sq: {
     todaySuggestion: 'SUGJERIMI I SOTËM',
@@ -72,6 +73,7 @@ const UI = {
     clearAll:        'Fshi të Gjitha',
     logFor:          'Regjistro stërvitje për',
     changeWorkout:   'Ndrysho',
+    selectDay:       'Zgjidh një Ditë',
   },
   es: {
     todaySuggestion: 'SUGERENCIA DE HOY',
@@ -105,6 +107,7 @@ const UI = {
     clearAll:        'Borrar Todo',
     logFor:          'Registrar para',
     changeWorkout:   'Cambiar',
+    selectDay:       'Seleccionar Día',
   },
 };
 

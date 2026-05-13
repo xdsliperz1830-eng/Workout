@@ -121,9 +121,10 @@ function formatDate(dateStr) {
 }
 
 function renderHeaderDate() {
-  document.getElementById('header-date').textContent =
-    new Date().toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US',
-      { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US',
+    { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('header-date').innerHTML =
+    sanitize(dateStr) + '<span class="hd-cal"> 📅</span>';
 }
 
 // ─── Suggestion algorithm ─────────────────────────────────────────────────────
@@ -474,24 +475,13 @@ function renderHistory() {
   // Reset confirm banner whenever history re-renders
   if (confirmEl) confirmEl.classList.add('hidden');
 
-  if (!history.length) {
-    if (clearBtn) clearBtn.style.display = 'none';
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="big">📝</div>
-        <strong>${sanitize(t('noHistory'))}</strong>
-        <div>${sanitize(t('noHistoryHint'))}</div>
-      </div>
-    `;
-    return;
-  }
+  if (clearBtn) clearBtn.style.display = history.length ? '' : 'none';
 
-  if (clearBtn) clearBtn.style.display = '';
-
-  // Only show days that have at least one real workout in the window
-  const earliest = history[history.length - 1]?.date;
+  // With no history show the last 7 days (all rest days, all tappable to log)
+  const earliest = history.length ? history[history.length - 1].date : null;
+  const maxDays  = history.length ? 21 : 7;
   const rows = [];
-  for (let i = 0; i < 21; i++) {
+  for (let i = 0; i < maxDays; i++) {
     const d  = new Date();
     d.setDate(d.getDate() - i);
     const ds = localDateStr(d);
@@ -544,6 +534,89 @@ function cancelClearHistory() {
 function doClearHistory() {
   try { localStorage.removeItem(HISTORY_KEY); } catch {}
   renderHistory();
+}
+
+function openDateSelector() {
+  if (document.querySelector('.modal-bg')) return;
+
+  const history = getHistory();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '✕';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.addEventListener('click', close);
+  box.appendChild(closeBtn);
+
+  const title = document.createElement('div');
+  title.className = 'modal-title';
+  title.style.marginBottom = '16px';
+  title.textContent = t('selectDay');
+  box.appendChild(title);
+
+  for (let i = 0; i < 14; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = localDateStr(d);
+
+    const entry = history.find(h => h.date === ds);
+    const wt    = entry ? WORKOUT_TYPES.find(w => w.id === entry.workoutId) : null;
+
+    const row = document.createElement('button');
+    row.className = 'date-sel-row';
+
+    const bar = document.createElement('span');
+    bar.className = 'date-sel-bar';
+    bar.style.background = wt ? wt.color : 'var(--border)';
+
+    const info = document.createElement('div');
+    info.className = 'date-sel-info';
+
+    const dateLabel = document.createElement('div');
+    dateLabel.className = 'date-sel-date';
+    dateLabel.textContent = formatDate(ds);
+
+    const statusLabel = document.createElement('div');
+    statusLabel.className = 'date-sel-status';
+    statusLabel.textContent = wt ? wtName(wt) : t('restDay');
+    if (!wt) statusLabel.style.fontStyle = 'italic';
+
+    info.appendChild(dateLabel);
+    info.appendChild(statusLabel);
+
+    const right = document.createElement('span');
+    right.className = 'date-sel-right';
+    right.textContent = wt ? wt.emoji : '+';
+
+    row.appendChild(bar);
+    row.appendChild(info);
+    row.appendChild(right);
+
+    row.addEventListener('click', () => {
+      close();
+      openDayPicker(ds);
+    });
+    box.appendChild(row);
+  }
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
 }
 
 function openDayPicker(dateStr) {
@@ -847,6 +920,7 @@ function init() {
   updateNavLabels();
   renderHeaderDate();
   renderHome();
+  document.getElementById('header-date').addEventListener('click', openDateSelector);
 }
 
 // Works whether DOMContentLoaded already fired (inline scripts) or not (defer)

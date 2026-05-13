@@ -92,6 +92,38 @@ body {
 .app-header h1 { font-size: 18px; font-weight: 800; line-height: 1; }
 .app-header p  { font-size: 12px; color: var(--text2); margin-top: 2px; }
 
+#header-date {
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity var(--t);
+  display: inline-block;
+}
+#header-date:active { opacity: .5; }
+.hd-cal { opacity: .45; font-style: normal; }
+
+/* ─── Date-selector sheet ────────────────────────── */
+
+.date-sel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  text-align: left;
+  transition: background var(--t);
+}
+.date-sel-row:active { background: var(--border); }
+.date-sel-bar    { width: 4px; height: 38px; border-radius: 2px; flex-shrink: 0; }
+.date-sel-info   { flex: 1; min-width: 0; }
+.date-sel-date   { font-size: 14px; font-weight: 700; color: var(--text); }
+.date-sel-status { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.date-sel-right  { font-size: 20px; flex-shrink: 0; min-width: 28px; text-align: center; }
+
 /* ─── Language switcher ──────────────────────────── */
 
 .lang-switcher {
