@@ -107,7 +107,11 @@ function localDateStr(date) {
 function todayStr() { return localDateStr(); }
 
 function daysSince(dateStr) {
-  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86400000);
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const past  = new Date(y, m - 1, d);        // local midnight of that date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);                 // local midnight today
+  return Math.round((today - past) / 86400000);
 }
 
 function formatDate(dateStr) {
@@ -689,7 +693,7 @@ function openDayPicker(dateStr) {
       addToHistory(wt.id, dateStr);
       close();
       renderHistory();
-      if (dateStr === todayStr()) renderHome();
+      renderHome();
     });
     box.appendChild(btn);
   });
