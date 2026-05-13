@@ -141,7 +141,7 @@ function getSuggestion(history) {
   const scored = WORKOUT_TYPES.map(wt => {
     const last = hist.filter(h => h.workoutId === wt.id)
                      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    return { wt, score: last ? daysSince(last.date) : 999 };
+    return { wt, score: last ? daysSince(last.date) : Infinity };
   });
   scored.sort((a, b) => b.score - a.score);
   return scored[0].wt;
@@ -176,7 +176,6 @@ async function fetchCategory(catId) {
       `https://wger.de/api/v2/exerciseinfo/?format=json&language=2&category=${catId}&limit=80&offset=0`,
       { signal: controller.signal }
     );
-    clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP ' + res.status);
 
     const json = await res.json();
@@ -246,11 +245,12 @@ async function fetchCategory(catId) {
 
     return withImages;
   } catch (err) {
-    clearTimeout(tid);
     if (err.name !== 'AbortError') {
       console.warn('API unavailable for category', catId, err);
     }
     return null; // triggers FALLBACK in caller
+  } finally {
+    clearTimeout(tid);
   }
 }
 
@@ -713,7 +713,19 @@ function showView(name) {
 
   if (name === 'home')    renderHome();
   if (name === 'history') renderHistory();
-  if (name === 'workout' && !activeWorkout) startWorkout(getSuggestion().id);
+  if (name === 'workout') {
+    if (!activeWorkout) {
+      startWorkout(getSuggestion().id);
+    } else {
+      // Re-check done state — may have changed via history date picker
+      const done = todayEntry()?.workoutId === activeWorkout.type.id;
+      const btn  = document.getElementById('btn-complete');
+      if (btn) {
+        btn.textContent = done ? t('completedToday') : t('markComplete');
+        btn.classList.toggle('done', done);
+      }
+    }
+  }
 }
 
 // ─── Workout flow ──────────────────────────────────────────────────────────────
