@@ -37,6 +37,8 @@ const UI = {
     clearConfirmMsg: 'Clear all workout history?',
     cancel:          'Cancel',
     clearAll:        'Clear All',
+    logFor:          'Log workout for',
+    changeWorkout:   'Change',
   },
   sq: {
     todaySuggestion: 'SUGJERIMI I SOTËM',
@@ -68,6 +70,8 @@ const UI = {
     clearConfirmMsg: 'Fshi të gjithë historinë e stërvitjes?',
     cancel:          'Anulo',
     clearAll:        'Fshi të Gjitha',
+    logFor:          'Regjistro stërvitje për',
+    changeWorkout:   'Ndrysho',
   },
   es: {
     todaySuggestion: 'SUGERENCIA DE HOY',
@@ -99,6 +103,8 @@ const UI = {
     clearConfirmMsg: '¿Borrar todo el historial de entrenamientos?',
     cancel:          'Cancelar',
     clearAll:        'Borrar Todo',
+    logFor:          'Registrar para',
+    changeWorkout:   'Cambiar',
   },
 };
 

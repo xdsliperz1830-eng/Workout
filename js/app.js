@@ -87,9 +87,11 @@ function getHistory() {
   catch { return []; }
 }
 
-function addToHistory(workoutId) {
-  const history = getHistory().filter(h => h.date !== todayStr());
-  history.unshift({ date: todayStr(), workoutId });
+function addToHistory(workoutId, dateStr) {
+  const ds = dateStr || todayStr();
+  const history = getHistory().filter(h => h.date !== ds);
+  history.push({ date: ds, workoutId });
+  history.sort((a, b) => b.date.localeCompare(a.date));
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 90))); }
   catch { /* storage quota exceeded — history won't persist this session */ }
 }
@@ -499,24 +501,25 @@ function renderHistory() {
 
     if (entry && wt) {
       rows.push(`
-        <div class="hist-item">
+        <div class="hist-item" onclick="openDayPicker('${ds}')">
           <div class="hist-bar" style="background:${wt.color}"></div>
           <div class="hist-info">
             <div class="hist-name">${sanitize(wtName(wt))}</div>
             <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
           <div class="hist-icon">${wt.emoji}</div>
+          <span class="hist-chevron">›</span>
         </div>
       `);
     } else {
       rows.push(`
-        <div class="hist-item">
+        <div class="hist-item" onclick="openDayPicker('${ds}')">
           <div class="hist-bar" style="background:var(--border)"></div>
           <div class="hist-info">
             <div class="hist-name rest-day">${sanitize(t('restDay'))}</div>
             <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
-          <div class="hist-icon">😴</div>
+          <span class="hist-add">+</span>
         </div>
       `);
     }
@@ -541,6 +544,86 @@ function cancelClearHistory() {
 function doClearHistory() {
   try { localStorage.removeItem(HISTORY_KEY); } catch {}
   renderHistory();
+}
+
+function openDayPicker(dateStr) {
+  if (document.querySelector('.modal-bg')) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '✕';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.addEventListener('click', close);
+  box.appendChild(closeBtn);
+
+  const title = document.createElement('div');
+  title.className = 'modal-title';
+  title.textContent = t('logFor');
+  box.appendChild(title);
+
+  const sub = document.createElement('div');
+  sub.className = 'modal-mus';
+  sub.style.marginBottom = '16px';
+  sub.textContent = formatDate(dateStr);
+  box.appendChild(sub);
+
+  WORKOUT_TYPES.forEach(wt => {
+    const btn = document.createElement('button');
+    btn.className = 'day-picker-btn';
+
+    const dot = document.createElement('span');
+    dot.className = 'dp-dot';
+    dot.style.background = wt.color;
+
+    const info = document.createElement('div');
+    info.className = 'dp-info';
+
+    const name = document.createElement('div');
+    name.className = 'dp-name';
+    name.textContent = wtName(wt);
+
+    const mus = document.createElement('div');
+    mus.className = 'dp-muscles';
+    mus.textContent = wtMuscles(wt).join(' · ');
+
+    info.appendChild(name);
+    info.appendChild(mus);
+
+    const emoji = document.createElement('span');
+    emoji.className = 'dp-emoji';
+    emoji.textContent = wt.emoji;
+
+    btn.appendChild(dot);
+    btn.appendChild(info);
+    btn.appendChild(emoji);
+
+    btn.addEventListener('click', () => {
+      addToHistory(wt.id, dateStr);
+      close();
+      renderHistory();
+      if (dateStr === todayStr()) renderHome();
+    });
+    box.appendChild(btn);
+  });
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────

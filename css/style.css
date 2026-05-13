@@ -446,13 +446,42 @@ body {
   border-radius: 12px;
   padding: 13px 14px;
   margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--t), opacity var(--t);
 }
+.hist-item:active { transform: scale(.98); opacity: .75; }
 .hist-bar  { width: 4px; height: 44px; border-radius: 2px; flex-shrink: 0; }
 .hist-info { flex: 1; min-width: 0; }
 .hist-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist-date { font-size: 12px; color: var(--text2); margin-top: 2px; }
 .hist-icon { font-size: 22px; flex-shrink: 0; }
+.hist-chevron { font-size: 20px; font-weight: 300; color: var(--text2); line-height: 1; flex-shrink: 0; }
+.hist-add  { font-size: 22px; font-weight: 300; color: var(--text2); line-height: 1; flex-shrink: 0; width: 28px; text-align: center; }
 .rest-day  { color: var(--text2); font-style: italic; }
+
+/* ─── Day Picker modal ──────────────────────────────── */
+
+.day-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  text-align: left;
+  transition: background var(--t);
+}
+.day-picker-btn:active { background: var(--border); }
+.dp-dot     { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dp-info    { flex: 1; min-width: 0; }
+.dp-name    { font-size: 15px; font-weight: 700; color: var(--text); }
+.dp-muscles { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.dp-emoji   { font-size: 22px; flex-shrink: 0; }
 
 .empty-state {
   display: flex;
