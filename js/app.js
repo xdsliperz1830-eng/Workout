@@ -930,6 +930,15 @@ function init() {
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
 
+  // iOS Safari preserves the DOM across backgrounding — without this the home
+  // view's "X d ago" labels stay frozen at the "today" used during init().
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    renderHeaderDate();
+    if (currentView === 'home')    renderHome();
+    if (currentView === 'history') renderHistory();
+  });
+
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === currentLang)
   );
