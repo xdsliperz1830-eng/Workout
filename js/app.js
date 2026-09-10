@@ -88,7 +88,11 @@ function getHistory() {
 }
 
 function addToHistory(workoutId, dateStr) {
-  const ds = dateStr || todayStr();
+  const today = todayStr();
+  // Clamp to today: the pickers only offer past days, but a device clock or
+  // timezone change can still hand us a future date. A stored future date
+  // would render as a negative "days ago" on the home screen forever.
+  const ds = (dateStr && dateStr <= today) ? dateStr : today;
   const history = getHistory().filter(h => h.date !== ds);
   history.push({ date: ds, workoutId });
   history.sort((a, b) => b.date.localeCompare(a.date));
@@ -111,7 +115,10 @@ function daysSince(dateStr) {
   const past  = new Date(y, m - 1, d);        // local midnight of that date
   const today = new Date();
   today.setHours(0, 0, 0, 0);                 // local midnight today
-  return Math.round((today - past) / 86400000);
+  // Math.round (not floor) absorbs the ±1h skew when a DST boundary falls
+  // between the two dates. Math.max keeps the result non-negative so a stale
+  // render or a backwards clock change can never print "-1 d ago".
+  return Math.max(0, Math.round((today - past) / 86400000));
 }
 
 function formatDate(dateStr) {
@@ -133,6 +140,12 @@ function renderHeaderDate() {
 
 // ─── Suggestion algorithm ─────────────────────────────────────────────────────
 
+// Stand-in "days rested" for a workout that has never been logged. Must be a
+// finite number: Infinity - Infinity is NaN, and a comparator that returns NaN
+// leaves sort order implementation-defined, so the suggestion would jump around
+// between renders whenever two or more workouts were never done.
+const NEVER_DONE_SCORE = 1e9;
+
 function todayEntry() {
   return getHistory().find(h => h.date === todayStr()) || null;
 }
@@ -142,12 +155,14 @@ function getSuggestion(history) {
   const todayEnt = hist.find(h => h.date === todayStr()) || null;
   if (todayEnt) return WORKOUT_TYPES.find(w => w.id === todayEnt.workoutId) || WORKOUT_TYPES[0];
 
-  const scored = WORKOUT_TYPES.map(wt => {
+  const scored = WORKOUT_TYPES.map((wt, order) => {
     const last = hist.filter(h => h.workoutId === wt.id)
                      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    return { wt, score: last ? daysSince(last.date) : Infinity };
+    return { wt, order, score: last ? daysSince(last.date) : NEVER_DONE_SCORE };
   });
-  scored.sort((a, b) => b.score - a.score);
+  // Longest-rested first; ties break on WORKOUT_TYPES order so repeated renders
+  // always land on the same suggestion.
+  scored.sort((a, b) => (b.score - a.score) || (a.order - b.order));
   return scored[0].wt;
 }
 
@@ -442,9 +457,17 @@ function renderWorkoutHeader(wt) {
   `;
 }
 
+// Single source of truth for the complete-button's label + state, so the
+// "already logged today" check can't drift between the paths that set it.
+function setCompleteBtn(done) {
+  const btn = document.getElementById('btn-complete');
+  if (!btn) return;
+  btn.textContent = done ? t('completedToday') : t('markComplete');
+  btn.classList.toggle('done', done);
+}
+
 function renderExercises(exercises, wt, alreadyDone) {
   const grid = document.getElementById('exercise-grid');
-  const btn  = document.getElementById('btn-complete');
 
   if (!exercises.length) {
     grid.innerHTML = `
@@ -456,11 +479,7 @@ function renderExercises(exercises, wt, alreadyDone) {
   }
 
   grid.innerHTML = exercises.map((ex, i) => renderCard(ex, i, wt)).join('');
-
-  if (btn) {
-    btn.textContent = alreadyDone ? t('completedToday') : t('markComplete');
-    btn.classList.toggle('done', alreadyDone);
-  }
+  setCompleteBtn(alreadyDone);
 }
 
 function renderHistory() {
@@ -481,8 +500,12 @@ function renderHistory() {
 
   if (clearBtn) clearBtn.style.display = history.length ? '' : 'none';
 
-  // With no history show the last 7 days (all rest days, all tappable to log)
-  const earliest = history.length ? history[history.length - 1].date : null;
+  // With no history show the last 7 days (all rest days, all tappable to log).
+  // Derive the oldest date rather than trusting the array to be sorted — an
+  // out-of-order entry would otherwise cut the list short via the break below.
+  const earliest = history.length
+    ? history.reduce((min, h) => (h.date < min ? h.date : min), history[0].date)
+    : null;
   const maxDays  = history.length ? 21 : 7;
   const rows = [];
   for (let i = 0; i < maxDays; i++) {
@@ -538,6 +561,7 @@ function cancelClearHistory() {
 function doClearHistory() {
   try { localStorage.removeItem(HISTORY_KEY); } catch {}
   renderHistory();
+  renderHome();
 }
 
 function openDateSelector() {
@@ -694,6 +718,8 @@ function openDayPicker(dateStr) {
       close();
       renderHistory();
       renderHome();
+      // The logged day may be today, which flips the complete-button state
+      if (activeWorkout) setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
     });
     box.appendChild(btn);
   });
@@ -722,13 +748,20 @@ function showView(name) {
       startWorkout(getSuggestion().id);
     } else {
       // Re-check done state — may have changed via history date picker
-      const done = todayEntry()?.workoutId === activeWorkout.type.id;
-      const btn  = document.getElementById('btn-complete');
-      if (btn) {
-        btn.textContent = done ? t('completedToday') : t('markComplete');
-        btn.classList.toggle('done', done);
-      }
+      setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
     }
+  }
+}
+
+// Bring the visible view back in sync with the current date/history. iOS Safari
+// keeps the DOM alive across backgrounding, so a page opened yesterday would
+// otherwise keep showing yesterday's "days ago" labels indefinitely.
+function refreshCurrentView() {
+  renderHeaderDate();
+  if (currentView === 'home')    renderHome();
+  if (currentView === 'history') renderHistory();
+  if (currentView === 'workout' && activeWorkout) {
+    setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
   }
 }
 
@@ -750,11 +783,7 @@ async function startWorkout(workoutId) {
     </div>
   `;
 
-  const btn = document.getElementById('btn-complete');
-  if (btn) {
-    btn.textContent = t('markComplete');
-    btn.classList.remove('done');
-  }
+  setCompleteBtn(todayEntry()?.workoutId === workoutId);
 
   const exercises = await loadExercisesForWorkout(wt);
 
@@ -762,8 +791,7 @@ async function startWorkout(workoutId) {
   if (activeWorkout !== myWorkout) return;
 
   activeWorkout.exercises = exercises;
-  const done = todayEntry()?.workoutId === workoutId;
-  renderExercises(exercises, wt, done);
+  renderExercises(exercises, wt, todayEntry()?.workoutId === workoutId);
 }
 
 function completeWorkout() {
@@ -773,8 +801,7 @@ function completeWorkout() {
 
   const { type } = activeWorkout;
   addToHistory(type.id);
-  btn.textContent = t('completedToday');
-  btn.classList.add('done');
+  setCompleteBtn(true);
   toast(`${type.emoji} ${wtName(type)}`);
 }
 
@@ -930,14 +957,22 @@ function init() {
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
 
-  // iOS Safari preserves the DOM across backgrounding — without this the home
-  // view's "X d ago" labels stay frozen at the "today" used during init().
+  // Re-sync whenever the app returns to the foreground, and on bfcache restore
+  // (iOS back-swipe), which fires pageshow but not visibilitychange.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
-    renderHeaderDate();
-    if (currentView === 'home')    renderHome();
-    if (currentView === 'history') renderHistory();
+    if (document.visibilityState === 'visible') refreshCurrentView();
   });
+  window.addEventListener('pageshow', e => { if (e.persisted) refreshCurrentView(); });
+
+  // Catch the midnight rollover while the app is sitting open in the foreground
+  let lastSeenDay = todayStr();
+  setInterval(() => {
+    const now = todayStr();
+    if (now !== lastSeenDay) {
+      lastSeenDay = now;
+      refreshCurrentView();
+    }
+  }, 60000);
 
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === currentLang)
