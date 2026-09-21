@@ -2,12 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <!-- No user-scalable=no: it blocks pinch-zoom (WCAG 1.4.4) and iOS honours it
+       in standalone mode, which is how the installed app runs. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- script-src 'self' is the part that matters: it stops any HTML injected
+       through the exercise API from executing. Inline styles stay allowed
+       because the render functions set colours via style attributes, and
+       img-src stays broad so a CDN change upstream can't blank the photos. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://wger.de; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="Track muscle group workouts, see which muscles are rested, and get a suggestion for what to train today.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Muscles">
   <meta name="theme-color" content="#0F0F0F">
   <link rel="manifest" href="manifest.json">
+  <!-- iOS ignores the manifest's icons for the home screen and needs a real
+       PNG here, or it uses a screenshot of the page instead. -->
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-192.png" type="image/png">
   <title>Muscle Tracker</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -16,16 +28,16 @@
 
     <header class="app-header">
       <div class="header-left">
-        <span class="header-icon">💪</span>
+        <span class="header-icon" aria-hidden="true">💪</span>
         <div>
           <h1>Muscle Tracker</h1>
-          <p id="header-date"></p>
+          <p id="header-date" role="button" tabindex="0" data-action="open-dates"></p>
         </div>
       </div>
-      <div class="lang-switcher">
-        <button class="lang-btn active" data-lang="en" onclick="setLang('en')" title="English">🇺🇸</button>
-        <button class="lang-btn" data-lang="sq" onclick="setLang('sq')" title="Shqip">🇦🇱</button>
-        <button class="lang-btn" data-lang="es" onclick="setLang('es')" title="Español">🇪🇸</button>
+      <div class="lang-switcher" role="group" aria-label="Language">
+        <button class="lang-btn active" data-lang="en" data-action="set-lang" data-arg="en" title="English" aria-label="English">🇺🇸</button>
+        <button class="lang-btn" data-lang="sq" data-action="set-lang" data-arg="sq" title="Shqip" aria-label="Shqip">🇦🇱</button>
+        <button class="lang-btn" data-lang="es" data-action="set-lang" data-arg="es" title="Español" aria-label="Español">🇪🇸</button>
       </div>
     </header>
 
@@ -36,7 +48,7 @@
         <div id="label-today" class="section-label">TODAY'S SUGGESTION</div>
         <div id="suggestion-card"></div>
 
-        <div id="label-status" class="section-label" style="margin-top:24px">MUSCLE STATUS</div>
+        <div id="label-status" class="section-label section-label-spaced">MUSCLE STATUS</div>
         <div id="muscle-status"></div>
       </section>
 
@@ -45,7 +57,7 @@
         <div id="workout-header"></div>
         <div id="exercise-grid" class="exercise-grid"></div>
         <div class="complete-wrap">
-          <button id="btn-complete" class="btn-complete" onclick="completeWorkout()">
+          <button id="btn-complete" class="btn-complete" data-action="complete">
             ✓ Mark Workout Complete
           </button>
         </div>
@@ -55,16 +67,16 @@
       <section id="view-history" class="view hidden">
         <div class="hist-header-row">
           <div id="label-history" class="section-label">WORKOUT HISTORY</div>
-          <button id="btn-clear-history" class="btn-clear-history" onclick="promptClearHistory()" style="display:none">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          <button id="btn-clear-history" class="btn-clear-history" data-action="clear-prompt" style="display:none">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             <span id="btn-clear-label"></span>
           </button>
         </div>
         <div id="hist-confirm" class="hist-confirm hidden">
           <span id="hist-confirm-msg" class="clear-msg"></span>
           <div class="clear-btns">
-            <button class="btn-cancel" onclick="cancelClearHistory()" id="btn-cancel-clear"></button>
-            <button class="btn-confirm-clear" onclick="doClearHistory()" id="btn-do-clear"></button>
+            <button class="btn-cancel" data-action="clear-cancel" id="btn-cancel-clear"></button>
+            <button class="btn-confirm-clear" data-action="clear-do" id="btn-do-clear"></button>
           </div>
         </div>
         <div id="history-list"></div>
@@ -72,17 +84,17 @@
 
     </main>
 
-    <nav class="bottom-nav">
-      <button class="nav-btn active" data-view="home" onclick="showView('home')">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    <nav class="bottom-nav" aria-label="Main">
+      <button class="nav-btn active" data-view="home" data-action="show-view" data-arg="home" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         <span>Home</span>
       </button>
-      <button class="nav-btn" data-view="workout" onclick="showView('workout')">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>
+      <button class="nav-btn" data-view="workout" data-action="show-view" data-arg="workout">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>
         <span>Workout</span>
       </button>
-      <button class="nav-btn" data-view="history" onclick="showView('history')">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+      <button class="nav-btn" data-view="history" data-action="show-view" data-arg="history">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
         <span>History</span>
       </button>
     </nav>

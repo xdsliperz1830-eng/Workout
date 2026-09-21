@@ -1,8 +1,26 @@
 'use strict';
 
+// ─── Safe storage access ──────────────────────────────────────────────────────
+
+// Safari with "Block All Cookies" throws a SecurityError on *any* localStorage
+// access — including the property read itself, before getItem is even called.
+// Every touch goes through these so a locked-down device degrades to an
+// in-memory session instead of a blank screen.
+function lsGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function lsSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* quota or blocked — skip */ }
+}
+
+function lsRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* blocked — nothing to do */ }
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let currentLang   = localStorage.getItem('mtracker_lang') || 'en';
+let currentLang   = lsGet('mtracker_lang') || 'en';
 let activeWorkout = null;   // { type, exercises }
 let currentView   = 'home';
 
@@ -52,7 +70,7 @@ function setLang(code) {
   if (!LANGUAGES[code]) return;
   currentLang = code;
   document.documentElement.lang = code;
-  try { localStorage.setItem('mtracker_lang', code); } catch { /* quota full — continue */ }
+  lsSet('mtracker_lang', code);
 
   document.querySelectorAll('.lang-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === code)
@@ -82,9 +100,23 @@ function updateNavLabels() {
 const HISTORY_KEY = 'mtracker_history_v1';
 const CACHE_PFX   = 'mtracker_cache_v3_'; // bumped: old v2 cache had imageless API exercises
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function getHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  let parsed;
+  try { parsed = JSON.parse(lsGet(HISTORY_KEY) || '[]'); }
   catch { return []; }
+  // Valid JSON of the wrong shape (say an object) would sail past a parse-only
+  // guard and then throw on the first .filter/.find, breaking every view — so
+  // check the shape of the array and of each entry.
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(h =>
+    h && typeof h.date === 'string' && DATE_RE.test(h.date) && typeof h.workoutId === 'string'
+  );
+}
+
+function saveHistory(history) {
+  lsSet(HISTORY_KEY, JSON.stringify(history.slice(0, 90)));
 }
 
 function addToHistory(workoutId, dateStr) {
@@ -96,8 +128,11 @@ function addToHistory(workoutId, dateStr) {
   const history = getHistory().filter(h => h.date !== ds);
   history.push({ date: ds, workoutId });
   history.sort((a, b) => b.date.localeCompare(a.date));
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 90))); }
-  catch { /* storage quota exceeded — history won't persist this session */ }
+  saveHistory(history);
+}
+
+function removeFromHistory(dateStr) {
+  saveHistory(getHistory().filter(h => h.date !== dateStr));
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -170,12 +205,12 @@ function getSuggestion(history) {
 
 function getCached(catId) {
   try {
-    const raw = localStorage.getItem(CACHE_PFX + catId);
+    const raw = lsGet(CACHE_PFX + catId);
     if (raw) {
       const { data, ts } = JSON.parse(raw);
-      if (Date.now() - ts < 48 * 3600 * 1000) return data;
+      if (Array.isArray(data) && Date.now() - ts < 48 * 3600 * 1000) return data;
     }
-  } catch { /* ignore */ }
+  } catch { /* corrupt entry — fall through and refetch */ }
   return null;
 }
 
@@ -258,9 +293,7 @@ async function fetchCategory(catId) {
 
     // Cache and return only exercises with images — saves localStorage quota
     const withImages = exercises.filter(e => e.image);
-    try {
-      localStorage.setItem(CACHE_PFX + catId, JSON.stringify({ data: withImages, ts: Date.now() }));
-    } catch { /* quota exceeded — results used in-memory this session */ }
+    lsSet(CACHE_PFX + catId, JSON.stringify({ data: withImages, ts: Date.now() }));
 
     return withImages;
   } catch (err) {
@@ -367,19 +400,18 @@ function renderCard(ex, i, wt) {
   const canRefresh = pool.some(e => !usedIds.has(e.id));
 
   return `
-    <div class="ex-card" onclick="openDetail(${i})">
+    <div class="ex-card" role="button" tabindex="0" data-action="open-detail" data-arg="${i}">
       <div class="ex-img-wrap">
         ${imgUrl
-          ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="eager"
-               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="${i < 4 ? 'eager' : 'lazy'}">`
           : ''}
         <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
-          <span style="font-size:36px">${icon}</span>
+          <span style="font-size:36px" aria-hidden="true">${icon}</span>
           <span class="ex-placeholder-name">${name}</span>
         </div>
         <div class="ex-num">${i + 1}</div>
-        ${canRefresh ? `<button class="ex-refresh" onclick="event.stopPropagation();refreshExercise(${i})" aria-label="Swap exercise">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        ${canRefresh ? `<button class="ex-refresh" data-action="refresh-ex" data-arg="${i}" aria-label="Swap exercise">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
         </button>` : ''}
       </div>
       <div class="ex-info">
@@ -403,7 +435,7 @@ function renderHome() {
   // Suggestion card — uses only hardcoded data; sanitize for defence-in-depth
   document.getElementById('suggestion-card').innerHTML = `
     <div class="s-card" style="background:${wt.gradient}">
-      <span class="s-emoji">${wt.emoji}</span>
+      <span class="s-emoji" aria-hidden="true">${wt.emoji}</span>
       <div class="s-name">
         ${sanitize(wtName(wt))}
         ${done ? `<span class="done-badge">${sanitize(t('doneBadge'))}</span>` : ''}
@@ -413,7 +445,7 @@ function renderHome() {
         ${wtMuscles(wt).map(m => `<span class="s-tag">${sanitize(m)}</span>`).join('')}
         <span class="s-tag">8 ${sanitize(t('exercises'))}</span>
       </div>
-      <button class="btn-start" onclick="startWorkout('${sanitize(wt.id)}')">
+      <button class="btn-start" data-action="start-workout" data-arg="${sanitize(wt.id)}">
         ${sanitize(done ? t('viewAgain') : t('startWorkout'))}
       </button>
     </div>
@@ -431,9 +463,9 @@ function renderHome() {
       else              { label = `${d} ${t('dAgo')}`;          cls = d <= 2 ? 'medium' : 'ripe'; }
     }
     return `
-      <div class="status-row" onclick="startWorkout('${sanitize(w.id)}')">
+      <div class="status-row" role="button" tabindex="0" data-action="start-workout" data-arg="${sanitize(w.id)}">
         <div class="status-left">
-          <div class="status-dot" style="background:${w.color}"></div>
+          <div class="status-dot" style="background:${w.color}" aria-hidden="true"></div>
           <div>
             <div class="status-name">${sanitize(wtName(w))}</div>
             <div class="status-subs">${wtMuscles(w).map(sanitize).join(' · ')}</div>
@@ -441,7 +473,7 @@ function renderHome() {
         </div>
         <div class="status-right">
           <span class="status-days ${cls}">${sanitize(label)}</span>
-          <span class="status-chevron">›</span>
+          <span class="status-chevron" aria-hidden="true">›</span>
         </div>
       </div>
     `;
@@ -500,43 +532,53 @@ function renderHistory() {
 
   if (clearBtn) clearBtn.style.display = history.length ? '' : 'none';
 
-  // With no history show the last 7 days (all rest days, all tappable to log).
+  // Nothing ever logged: show the empty state instead of seven identical
+  // "Rest day" rows, keeping a way in to log a past workout.
+  if (!history.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="big" aria-hidden="true">🏋️</div>
+        <strong>${sanitize(t('noHistory'))}</strong>
+        <span>${sanitize(t('noHistoryHint'))}</span>
+        <button class="btn-empty-action" data-action="open-dates">${sanitize(t('selectDay'))}</button>
+      </div>
+    `;
+    return;
+  }
+
   // Derive the oldest date rather than trusting the array to be sorted — an
   // out-of-order entry would otherwise cut the list short via the break below.
-  const earliest = history.length
-    ? history.reduce((min, h) => (h.date < min ? h.date : min), history[0].date)
-    : null;
-  const maxDays  = history.length ? 21 : 7;
+  const earliest = history.reduce((min, h) => (h.date < min ? h.date : min), history[0].date);
   const rows = [];
-  for (let i = 0; i < maxDays; i++) {
+  for (let i = 0; i < 21; i++) {
     const d  = new Date();
     d.setDate(d.getDate() - i);
     const ds = localDateStr(d);
-    if (earliest && ds < earliest) break; // don't pad rest days before first ever workout
+    if (ds < earliest) break; // don't pad rest days before the first ever workout
     const entry = history.find(h => h.date === ds);
     const wt    = entry ? WORKOUT_TYPES.find(w => w.id === entry.workoutId) : null;
 
     if (entry && wt) {
       rows.push(`
-        <div class="hist-item" onclick="openDayPicker('${ds}')">
-          <div class="hist-bar" style="background:${wt.color}"></div>
+        <div class="hist-item" role="button" tabindex="0" data-action="open-day" data-arg="${ds}">
+          <div class="hist-bar" style="background:${wt.color}" aria-hidden="true"></div>
           <div class="hist-info">
             <div class="hist-name">${sanitize(wtName(wt))}</div>
             <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
-          <div class="hist-icon">${wt.emoji}</div>
-          <span class="hist-chevron">›</span>
+          <div class="hist-icon" aria-hidden="true">${wt.emoji}</div>
+          <span class="hist-chevron" aria-hidden="true">›</span>
         </div>
       `);
     } else {
       rows.push(`
-        <div class="hist-item" onclick="openDayPicker('${ds}')">
-          <div class="hist-bar" style="background:var(--border)"></div>
+        <div class="hist-item" role="button" tabindex="0" data-action="open-day" data-arg="${ds}">
+          <div class="hist-bar" style="background:var(--border)" aria-hidden="true"></div>
           <div class="hist-info">
             <div class="hist-name rest-day">${sanitize(t('restDay'))}</div>
             <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
-          <span class="hist-add">+</span>
+          <span class="hist-add" aria-hidden="true">+</span>
         </div>
       `);
     }
@@ -559,30 +601,47 @@ function cancelClearHistory() {
 }
 
 function doClearHistory() {
-  try { localStorage.removeItem(HISTORY_KEY); } catch {}
+  lsRemove(HISTORY_KEY);
   renderHistory();
   renderHome();
 }
 
-function openDateSelector() {
-  if (document.querySelector('.modal-bg')) return;
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-  const history = getHistory();
+// Shared modal shell: builds the overlay, wires Escape and backdrop close, traps
+// Tab inside the dialog, and hands focus back to whatever opened it on close.
+function openModal(label) {
+  const opener = document.activeElement;
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-bg';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-
-  const close = () => {
-    overlay.remove();
-    document.removeEventListener('keydown', onKey);
-  };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
+  if (label) overlay.setAttribute('aria-label', label);
 
   const box = document.createElement('div');
   box.className = 'modal-box';
+  overlay.appendChild(box);
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey, true);
+    if (opener && document.contains(opener)) opener.focus();
+  };
+
+  const onKey = e => {
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key !== 'Tab') return;
+    const items = [...box.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0];
+    const last  = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  document.addEventListener('keydown', onKey, true);
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'modal-close';
@@ -590,6 +649,23 @@ function openDateSelector() {
   closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.addEventListener('click', close);
   box.appendChild(closeBtn);
+
+  return {
+    box,
+    close,
+    show() {
+      document.body.appendChild(overlay);
+      const first = box.querySelector(FOCUSABLE);
+      if (first) first.focus();
+    },
+  };
+}
+
+function openDateSelector() {
+  if (document.querySelector('.modal-bg')) return;
+
+  const history = getHistory();
+  const { box, close, show } = openModal(t('selectDay'));
 
   const title = document.createElement('div');
   title.className = 'modal-title';
@@ -642,35 +718,13 @@ function openDateSelector() {
     box.appendChild(row);
   }
 
-  overlay.appendChild(box);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.body.appendChild(overlay);
+  show();
 }
 
 function openDayPicker(dateStr) {
   if (document.querySelector('.modal-bg')) return;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-bg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-
-  const close = () => {
-    overlay.remove();
-    document.removeEventListener('keydown', onKey);
-  };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
-
-  const box = document.createElement('div');
-  box.className = 'modal-box';
-
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'modal-close';
-  closeBtn.textContent = '✕';
-  closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.addEventListener('click', close);
-  box.appendChild(closeBtn);
+  const { box, close, show } = openModal(t('logFor'));
 
   const title = document.createElement('div');
   title.className = 'modal-title';
@@ -716,26 +770,57 @@ function openDayPicker(dateStr) {
     btn.addEventListener('click', () => {
       addToHistory(wt.id, dateStr);
       close();
-      renderHistory();
-      renderHome();
-      // The logged day may be today, which flips the complete-button state
-      if (activeWorkout) setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
+      afterHistoryChange();
     });
     box.appendChild(btn);
   });
 
-  overlay.appendChild(box);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.body.appendChild(overlay);
+  // Clearing a single day used to be impossible — the only way to undo a
+  // mis-logged workout was wiping the entire history.
+  if (getHistory().some(h => h.date === dateStr)) {
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'day-picker-btn';
+
+    const dot = document.createElement('span');
+    dot.className = 'dp-dot';
+    dot.style.background = 'var(--border)';
+
+    const info = document.createElement('div');
+    info.className = 'dp-info';
+    const name = document.createElement('div');
+    name.className = 'dp-name rest-day';
+    name.textContent = t('restDay');
+    info.appendChild(name);
+
+    const mark = document.createElement('span');
+    mark.className = 'dp-emoji';
+    mark.textContent = '✕';
+
+    clearBtn.appendChild(dot);
+    clearBtn.appendChild(info);
+    clearBtn.appendChild(mark);
+
+    clearBtn.addEventListener('click', () => {
+      removeFromHistory(dateStr);
+      close();
+      afterHistoryChange();
+    });
+    box.appendChild(clearBtn);
+  }
+
+  show();
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
 function showView(name) {
   currentView = name;
-  document.querySelectorAll('.nav-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.view === name)
-  );
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    const isActive = b.dataset.view === name;
+    b.classList.toggle('active', isActive);
+    if (isActive) b.setAttribute('aria-current', 'page');
+    else         b.removeAttribute('aria-current');
+  });
   document.getElementById('view-home').classList.toggle('hidden',    name !== 'home');
   document.getElementById('view-workout').classList.toggle('hidden', name !== 'workout');
   document.getElementById('view-history').classList.toggle('hidden', name !== 'history');
@@ -763,6 +848,14 @@ function refreshCurrentView() {
   if (currentView === 'workout' && activeWorkout) {
     setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
   }
+}
+
+// Re-render everything that reads history after a day is logged or cleared. The
+// changed day may be today, which also flips the complete-button state.
+function afterHistoryChange() {
+  renderHistory();
+  renderHome();
+  if (activeWorkout) setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
 }
 
 // ─── Workout flow ──────────────────────────────────────────────────────────────
@@ -819,28 +912,7 @@ function openDetail(index) {
   const imgs    = ex.allImages || (ex.image ? [ex.image] : []);
 
   // Build modal with DOM API to avoid any innerHTML injection risk for dynamic content
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-bg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-
-  const close = () => {
-    overlay.remove();
-    document.removeEventListener('keydown', onKey);
-  };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
-
-  const box = document.createElement('div');
-  box.className = 'modal-box';
-
-  // Close button
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'modal-close';
-  closeBtn.textContent = '✕';
-  closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.addEventListener('click', close);
-  box.appendChild(closeBtn);
+  const { box, show } = openModal(name);
 
   // Image (or placeholder)
   if (imgs.length && safeUrl(imgs[0])) {
@@ -915,9 +987,7 @@ function openDetail(index) {
     box.appendChild(d);
   }
 
-  overlay.appendChild(box);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.body.appendChild(overlay);
+  show();
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -925,6 +995,7 @@ function openDetail(index) {
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';
+  el.setAttribute('role', 'status'); // announce completion to screen readers
   el.textContent = msg; // textContent — never innerHTML
   document.body.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
@@ -940,6 +1011,36 @@ function setAppHeight() {
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
 }
 
+// ─── Event delegation ─────────────────────────────────────────────────────────
+
+// Every interactive element carries data-action instead of an inline onclick:
+// inline handlers would force 'unsafe-inline' into script-src, which is exactly
+// the protection worth keeping against injected markup from the exercise API.
+const ACTIONS = {
+  'set-lang':      arg => setLang(arg),
+  'show-view':     arg => showView(arg),
+  'start-workout': arg => startWorkout(arg),
+  'open-detail':   arg => openDetail(Number(arg)),
+  'refresh-ex':    arg => refreshExercise(Number(arg)),
+  'open-day':      arg => openDayPicker(arg),
+  'open-dates':    ()  => openDateSelector(),
+  'complete':      ()  => completeWorkout(),
+  'clear-prompt':  ()  => promptClearHistory(),
+  'clear-cancel':  ()  => cancelClearHistory(),
+  'clear-do':      ()  => doClearHistory(),
+};
+
+function runAction(e) {
+  // closest() means the refresh button wins over the card it sits inside, so
+  // swapping an exercise no longer needs to stop propagation by hand.
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const fn = ACTIONS[el.dataset.action];
+  if (!fn) return;
+  e.preventDefault();
+  fn(el.dataset.arg);
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
 function init() {
@@ -949,9 +1050,36 @@ function init() {
   ['v1', 'v2'].forEach(v => {
     const pfx = `mtracker_cache_${v}_`;
     try {
-      Object.keys(localStorage).filter(k => k.startsWith(pfx)).forEach(k => localStorage.removeItem(k));
-    } catch {}
+      Object.keys(localStorage).filter(k => k.startsWith(pfx)).forEach(k => lsRemove(k));
+    } catch { /* storage blocked — nothing to clean up */ }
   });
+
+  const app = document.getElementById('app');
+  app.addEventListener('click', runAction);
+  app.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest('[data-action]');
+    if (!el || el.tagName === 'BUTTON') return; // native buttons already do this
+    runAction(e);
+  });
+
+  // Error events on <img> don't bubble, so catch them in the capture phase and
+  // reveal the gradient placeholder behind the broken image.
+  document.getElementById('exercise-grid').addEventListener('error', e => {
+    const img = e.target;
+    if (img.tagName !== 'IMG') return;
+    img.style.display = 'none';
+    const placeholder = img.nextElementSibling;
+    if (placeholder) placeholder.style.display = 'flex';
+  }, true);
+
+  // Cache the app shell so a home-screen launch still opens without a signal.
+  if ('serviceWorker' in navigator) {
+    const register = () => navigator.serviceWorker.register('sw.js')
+      .catch(err => console.warn('Service worker registration failed', err));
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register, { once: true });
+  }
 
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
@@ -980,7 +1108,6 @@ function init() {
   updateNavLabels();
   renderHeaderDate();
   renderHome();
-  document.getElementById('header-date').addEventListener('click', openDateSelector);
 }
 
 // Works whether DOMContentLoaded already fired (inline scripts) or not (defer)
