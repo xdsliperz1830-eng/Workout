@@ -9,8 +9,8 @@
        through the exercise API from executing. Inline styles stay allowed
        because the render functions set colours via style attributes, and
        img-src stays broad so a CDN change upstream can't blank the photos. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://wger.de; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
-  <meta name="description" content="Track muscle group workouts, see which muscles are rested, and get a suggestion for what to train today.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://wger.de https://api.anthropic.com; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="Track workouts and meals in one place: see which muscles are rested, get a suggestion for what to train, and log your nutrition against a daily calorie goal.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Muscles">
@@ -48,6 +48,9 @@
         <div id="label-today" class="section-label">TODAY'S SUGGESTION</div>
         <div id="suggestion-card"></div>
 
+        <div id="label-nutrition" class="section-label section-label-spaced">TODAY'S NUTRITION</div>
+        <div id="today-nutrition"></div>
+
         <div id="label-status" class="section-label section-label-spaced">MUSCLE STATUS</div>
         <div id="muscle-status"></div>
       </section>
@@ -61,6 +64,74 @@
             ✓ Mark Workout Complete
           </button>
         </div>
+      </section>
+
+      <!-- Meals View -->
+      <section id="view-meals" class="view hidden">
+
+        <div class="meal-date-bar">
+          <span id="meal-date-label" class="meal-date-label"></span>
+          <input type="date" id="meal-date" class="meal-date-input" aria-label="Date">
+        </div>
+
+        <div id="label-meal-totals" class="section-label"></div>
+        <div id="meal-totals" class="stat-row"></div>
+        <div class="goal-row">
+          <input type="number" id="meal-goal" class="goal-input" min="0" step="50" inputmode="numeric">
+          <span id="meal-goal-status" class="muted small"></span>
+        </div>
+        <div class="progress"><div class="progress-bar" id="meal-goal-bar"></div></div>
+
+        <div id="label-add-meal" class="section-label section-label-spaced"></div>
+        <form id="meal-form" class="meal-form">
+          <label class="field-wide">
+            <span data-i18n="foodName"></span>
+            <input name="name" type="text" required autocomplete="off">
+          </label>
+          <div class="field-row">
+            <label><span data-i18n="mealType"></span><select name="type"></select></label>
+            <label><span data-i18n="servings"></span><input name="servings" type="number" value="1" min="0.25" step="0.25" required inputmode="decimal"></label>
+          </div>
+          <div class="field-row">
+            <label><span data-i18n="calories"></span><input name="calories" type="number" min="0" step="1" placeholder="0" required inputmode="numeric"></label>
+            <label><span data-i18n="protein"></span><input name="protein" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
+            <label><span data-i18n="carbs"></span><input name="carbs" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
+            <label><span data-i18n="fat"></span><input name="fat" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
+          </div>
+          <button type="submit" id="btn-add-meal" class="btn-primary btn-block"></button>
+        </form>
+
+        <div id="label-assistant" class="section-label section-label-spaced"></div>
+        <p id="hint-assistant" class="muted hint"></p>
+        <div id="ai-config" class="ai-config"></div>
+        <div id="ai-chat" class="ai-chat"></div>
+        <form id="ai-form" class="ai-form">
+          <input type="text" id="ai-input" autocomplete="off">
+          <button type="submit" id="ai-send" class="btn-primary"></button>
+        </form>
+        <button type="button" class="btn-link ai-clear" data-action="ai-clear-chat">
+          <span id="ai-clear-label"></span>
+        </button>
+
+        <div id="label-logged" class="section-label section-label-spaced"></div>
+        <div id="meal-list"></div>
+
+        <div id="label-week-nut" class="section-label section-label-spaced"></div>
+        <div id="week-nut-totals" class="stat-row"></div>
+        <div class="chart" id="week-nut-chart"></div>
+
+        <div id="label-meal-data" class="section-label section-label-spaced"></div>
+        <div class="data-actions">
+          <button type="button" class="btn-secondary" data-action="meal-export">
+            <span id="btn-export-label"></span>
+          </button>
+          <label class="btn-secondary file-label">
+            <span id="btn-import-label"></span>
+            <input type="file" id="meal-import" accept=".csv,text/csv" hidden>
+          </label>
+        </div>
+        <p id="meal-data-status" class="muted small"></p>
+
       </section>
 
       <!-- History View -->
@@ -93,6 +164,10 @@
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>
         <span>Workout</span>
       </button>
+      <button class="nav-btn" data-view="meals" data-action="show-view" data-arg="meals">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+        <span>Meals</span>
+      </button>
       <button class="nav-btn" data-view="history" data-action="show-view" data-arg="history">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
         <span>History</span>
@@ -103,5 +178,7 @@
 
   <script src="js/data.js" defer></script>
   <script src="js/app.js" defer></script>
+  <script src="js/meals.js" defer></script>
+  <script src="js/nutrition-ai.js" defer></script>
 </body>
 </html>

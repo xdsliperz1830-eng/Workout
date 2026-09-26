@@ -9,7 +9,7 @@
  * Bump SHELL_CACHE when any shell file changes so clients pick it up.
  */
 
-const SHELL_CACHE = 'mtracker-shell-v1';
+const SHELL_CACHE = 'mtracker-shell-v2'; // v2: meal tracking merged in
 const IMG_CACHE   = 'mtracker-img-v1';
 const IMG_LIMIT   = 120; // exercise photos to retain before trimming oldest
 
@@ -19,6 +19,8 @@ const SHELL = [
   './css/style.css',
   './js/data.js',
   './js/app.js',
+  './js/meals.js',
+  './js/nutrition-ai.js',
   './manifest.json',
   './icon-180.png',
   './icon-192.png',

@@ -1,4 +1,8 @@
 :root {
+  /* Renders native controls (date picker, select, number steppers) dark so the
+     meal form doesn't punch white boxes through the theme. */
+  color-scheme: dark;
+
   --bg: #0F0F0F;
   --surface: #1A1A1A;
   --surface2: #252525;
@@ -702,3 +706,370 @@ body {
 }
 .nav-btn svg    { width: 22px; height: 22px; }
 .nav-btn.active { color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MEALS
+   Ported from the standalone Meal Tracker and restyled for the dark shell.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Shared bits the workout views never needed ─────────────────────── */
+
+.muted       { color: var(--text2); font-size: 13px; }
+.muted.small { font-size: 11.5px; }
+.hint        { margin: -4px 0 12px; }
+
+input, select {
+  font: inherit;
+  font-size: 15px;            /* < 16px makes iOS zoom the page on focus */
+  width: 100%;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+input::placeholder { color: #5A5A5A; }
+
+.btn-primary {
+  background: linear-gradient(135deg, #1E8449, #27AE60);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--t), opacity var(--t);
+}
+.btn-primary:active   { transform: scale(.98); }
+.btn-primary:disabled { opacity: .45; cursor: default; transform: none; }
+.btn-primary, .btn-secondary, .btn-danger { white-space: nowrap; }
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--t);
+}
+.btn-secondary:active { background: var(--border); }
+
+.btn-danger {
+  background: #3A1A1A;
+  color: #E74C3C;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn-danger:active { background: #4A2020; }
+
+.btn-link {
+  background: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn-link:active { color: var(--text); }
+
+.btn-block { display: block; width: 100%; }
+
+.progress {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: #2ECC71;
+  border-radius: 999px;
+  transition: width .25s ease;
+}
+.progress-bar.over { background: #E74C3C; }
+
+/* 4-up stat tiles, used by daily totals and the 7-day average */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.stat-row > div {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.stat-val { font-size: 17px; font-weight: 800; line-height: 1.1; }
+.stat-lbl { font-size: 10px; color: var(--text2); text-align: center; }
+
+/* ─── 7-day bar chart ─────────────────────────────────────────────────── */
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  height: 128px;
+  align-items: end;
+  margin-bottom: 6px;
+}
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+.bar-val {
+  font-size: 9px;
+  color: var(--text2);
+  margin-bottom: 3px;
+  min-height: 1em;
+}
+.bar {
+  width: 62%;
+  background: #1E8449;
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  transition: height .25s ease;
+}
+.bar.over { background: #E74C3C; }
+.bar-col.selected .bar { background: #2ECC71; }
+.bar-day {
+  font-size: 9.5px;
+  color: var(--text2);
+  margin-top: 5px;
+}
+
+/* ─── Home: today's nutrition ─────────────────────────────────────────── */
+
+.nut-card {
+  background: var(--surface);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--t), opacity var(--t);
+}
+.nut-card:active { transform: scale(.98); opacity: .8; }
+
+.nut-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.nut-kcal      { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.nut-kcal-val  { font-size: 26px; font-weight: 900; letter-spacing: -.5px; line-height: 1; }
+.nut-kcal-unit { font-size: 12px; color: var(--text2); }
+.nut-status    { font-size: 11.5px; color: #2ECC71; text-align: right; flex-shrink: 0; }
+.nut-status.over { color: #E74C3C; }
+
+.nut-macros {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--text2);
+  flex-wrap: wrap;
+}
+.nut-macros strong { color: var(--text); font-weight: 700; }
+
+/* ─── Meals: date bar ─────────────────────────────────────────────────── */
+
+.meal-date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.meal-date-label { font-size: 17px; font-weight: 800; }
+.meal-date-input { width: auto; flex-shrink: 0; font-size: 13px; padding: 7px 9px; }
+
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+.goal-input { width: 108px; flex-shrink: 0; font-size: 14px; padding: 7px 9px; }
+
+/* ─── Meals: add form ─────────────────────────────────────────────────── */
+
+.meal-form { margin-bottom: 4px; }
+.meal-form label,
+.meal-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  min-width: 0;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.field-wide { margin-bottom: 10px; }
+
+/* ─── Meals: logged list ──────────────────────────────────────────────── */
+
+.meal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--t), opacity var(--t);
+}
+.meal-item:active { transform: scale(.98); opacity: .75; }
+.meal-info   { flex: 1; min-width: 0; }
+.meal-name   { font-size: 14px; font-weight: 700; }
+.meal-macros { font-size: 11px; color: var(--text2); margin-top: 3px; }
+.meal-type {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 2px 6px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text2);
+  vertical-align: middle;
+}
+
+.empty-state.small       { padding: 28px 20px; gap: 5px; }
+.empty-state.small .big  { font-size: 32px; }
+
+/* ─── Meals: edit modal ───────────────────────────────────────────────── */
+
+.meal-edit-form { margin-top: 14px; }
+.modal-actions  { display: flex; gap: 8px; margin-top: 4px; }
+.modal-actions .btn-primary { flex: 1; }
+
+/* ─── Nutrition assistant ─────────────────────────────────────────────── */
+
+.ai-config { margin-bottom: 10px; }
+.ai-config p { margin-bottom: 8px; }
+
+.ai-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ai-key-row.inline { margin-bottom: 0; justify-content: space-between; }
+.ai-key-row input  { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.ai-key-row code   { color: var(--text); font-size: 11px; }
+
+.ai-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 10px;
+}
+.ai-chat:empty { display: none; }
+
+.chat-msg {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+.chat-user {
+  align-self: flex-end;
+  background: #1E8449;
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+.chat-assistant {
+  align-self: flex-start;
+  background: var(--surface);
+  border-bottom-left-radius: 5px;
+}
+.chat-assistant.chat-error { background: #3A1A1A; color: #F5B7B1; }
+.chat-pending { color: var(--text2); font-style: italic; }
+.chat-reply   { white-space: pre-wrap; }
+
+.est-card {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.est-name   { font-size: 13px; font-weight: 700; }
+.est-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  color: var(--text2);
+}
+.est-macros strong { color: var(--text); font-weight: 700; }
+.est-notes  { line-height: 1.4; }
+.est-add    { align-self: flex-start; }
+
+.ai-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ai-form input  { flex: 1; }
+.ai-form button { flex-shrink: 0; }
+.ai-clear { display: block; margin: 6px 0 0 auto; }
+
+/* ─── Meals: data actions ─────────────────────────────────────────────── */
+
+.data-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.file-label {
+  display: inline-block;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 9px;
+}
+
+@media (max-width: 360px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+}

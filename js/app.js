@@ -33,6 +33,24 @@ function sanitize(str) {
   return el.innerHTML;
 }
 
+// sanitize() covers & < >, which is enough for text nodes. Values interpolated
+// into a quoted attribute need the quotes escaped too or they can break out of
+// the attribute.
+function escapeAttr(str) {
+  return sanitize(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Workout history is keyed by date, but meals and chat messages need their own
+// identity — collision-resistant enough for a single-device log.
+function createId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// Modules loaded after this one (meals, nutrition assistant) register setup
+// here; they all run once the DOM is parsed, before the first render.
+const INIT_HOOKS = [];
+function onInit(fn) { INIT_HOOKS.push(fn); }
+
 // Only allow https:// URLs sourced from the wger API; reject anything else
 function safeUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -79,6 +97,7 @@ function setLang(code) {
   renderHeaderDate();
 
   if (currentView === 'home')    renderHome();
+  if (currentView === 'meals')   renderMealsView();
   if (currentView === 'history') renderHistory();
   if (currentView === 'workout' && activeWorkout) {
     renderWorkoutHeader(activeWorkout.type);
@@ -86,12 +105,15 @@ function setLang(code) {
     renderExercises(activeWorkout.exercises, activeWorkout.type, done);
   }
 
+  // The assistant's own labels are language-dependent too.
+  renderAiConfig();
+  renderAiChat();
   updateNavLabels();
 }
 
 function updateNavLabels() {
   const labels = document.querySelectorAll('.nav-btn span');
-  const keys   = ['home', 'workout', 'history'];
+  const keys   = ['home', 'workout', 'meals', 'history'];
   labels.forEach((el, i) => { el.textContent = t(keys[i]); });
 }
 
@@ -154,6 +176,21 @@ function daysSince(dateStr) {
   // between the two dates. Math.max keeps the result non-negative so a stale
   // render or a backwards clock change can never print "-1 d ago".
   return Math.max(0, Math.round((today - past) / 86400000));
+}
+
+// Shift a YYYY-MM-DD string by whole days, staying in local time.
+function addDays(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return localDateStr(dt);
+}
+
+// Short localised weekday for chart axes. Anchored at noon so a DST shift can't
+// tip the date onto the previous day.
+function weekdayLabel(dateStr) {
+  return new Date(dateStr + 'T12:00:00')
+    .toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US', { weekday: 'short' });
 }
 
 function formatDate(dateStr) {
@@ -429,8 +466,10 @@ function renderHome() {
   const wt       = getSuggestion(history);
   const done     = !!todayEnt;
 
-  document.getElementById('label-today').textContent  = t('todaySuggestion');
-  document.getElementById('label-status').textContent = t('muscleStatus');
+  document.getElementById('label-today').textContent     = t('todaySuggestion');
+  document.getElementById('label-status').textContent    = t('muscleStatus');
+  document.getElementById('label-nutrition').textContent = t('todayNutrition');
+  renderTodayNutrition();
 
   // Suggestion card — uses only hardcoded data; sanitize for defence-in-depth
   document.getElementById('suggestion-card').innerHTML = `
@@ -823,10 +862,12 @@ function showView(name) {
   });
   document.getElementById('view-home').classList.toggle('hidden',    name !== 'home');
   document.getElementById('view-workout').classList.toggle('hidden', name !== 'workout');
+  document.getElementById('view-meals').classList.toggle('hidden',   name !== 'meals');
   document.getElementById('view-history').classList.toggle('hidden', name !== 'history');
   document.getElementById('main').scrollTop = 0;
 
   if (name === 'home')    renderHome();
+  if (name === 'meals')   renderMealsView();
   if (name === 'history') renderHistory();
   if (name === 'workout') {
     if (!activeWorkout) {
@@ -844,6 +885,7 @@ function showView(name) {
 function refreshCurrentView() {
   renderHeaderDate();
   if (currentView === 'home')    renderHome();
+  if (currentView === 'meals')   renderMealsView();
   if (currentView === 'history') renderHistory();
   if (currentView === 'workout' && activeWorkout) {
     setCompleteBtn(todayEntry()?.workoutId === activeWorkout.type.id);
@@ -1107,12 +1149,15 @@ function init() {
   );
   updateNavLabels();
   renderHeaderDate();
-  renderHome();
 }
 
-// Works whether DOMContentLoaded already fired (inline scripts) or not (defer)
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+function boot() {
   init();
+  INIT_HOOKS.forEach(fn => fn());
+  showView('home');
 }
+
+// Deferred scripts all run before DOMContentLoaded fires, so waiting for it is
+// what guarantees meals.js and nutrition-ai.js have registered their hooks.
+if (document.readyState === 'complete') boot();
+else document.addEventListener('DOMContentLoaded', boot, { once: true });

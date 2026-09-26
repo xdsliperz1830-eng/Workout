@@ -1,7 +1,7 @@
 {
   "name": "Muscle Tracker",
   "short_name": "Muscles",
-  "description": "Track muscle group workouts and get smart suggestions",
+  "description": "Track muscle group workouts and meals: smart training suggestions plus daily nutrition against a calorie goal",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
