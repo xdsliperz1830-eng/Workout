@@ -125,7 +125,13 @@ body {
   flex: 1;
 }
 
-.header-icon { font-size: 26px; line-height: 1; }
+.header-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--cyan);
+  filter: drop-shadow(0 0 10px rgba(52, 213, 224, .35));
+}
 
 .app-header h1 { font-size: 18px; font-weight: 800; line-height: 1; }
 .app-header p  { font-size: 12px; color: var(--text2); margin-top: 2px; }
@@ -137,7 +143,13 @@ body {
   display: inline-block;
 }
 #header-date:active { opacity: .5; }
-.hd-cal { opacity: .45; font-style: normal; }
+.hd-caret {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+  margin-left: 1px;
+  opacity: .5;
+}
 
 /* ─── Date-selector sheet ────────────────────────── */
 
@@ -166,24 +178,29 @@ body {
 
 .lang-switcher {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   margin-left: auto;
   align-items: center;
 }
 
+/* Text labels rather than flag emoji: a flag names a country, not a language,
+   and EN/SQ/ES reads cleanly at this size. */
 .lang-btn {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 22px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
   line-height: 1;
-  padding: 4px 5px;
+  color: var(--text2);
+  padding: 6px 7px;
+  min-width: 30px;
   cursor: pointer;
-  opacity: .35;
-  transition: opacity .2s, border-color .2s;
+  transition: color .2s, border-color .2s, background .2s;
   touch-action: manipulation;
 }
 .lang-btn.active {
-  opacity: 1;
+  color: var(--text);
   border-color: rgba(255,255,255,.3);
 }
 
@@ -237,7 +254,6 @@ body {
   pointer-events: none;
 }
 
-.s-emoji  { font-size: 38px; display: block; margin-bottom: 8px; line-height: 1; }
 .s-name   { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 4px; line-height: 1.1; }
 .s-desc   { font-size: 13px; opacity: .75; margin-bottom: 14px; }
 
@@ -533,7 +549,6 @@ body {
 .hist-info { flex: 1; min-width: 0; }
 .hist-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist-date { font-size: 12px; color: var(--text2); margin-top: 2px; }
-.hist-icon { font-size: 22px; flex-shrink: 0; }
 .hist-chevron { font-size: 20px; font-weight: 300; color: var(--text2); line-height: 1; flex-shrink: 0; }
 .hist-add  { font-size: 22px; font-weight: 300; color: var(--text2); line-height: 1; flex-shrink: 0; width: 28px; text-align: center; }
 .rest-day  { color: var(--text2); font-style: italic; }
@@ -570,7 +585,7 @@ body {
   text-align: center;
   gap: 8px;
 }
-.empty-state .big    { font-size: 48px; }
+.empty-mark          { width: 44px; height: 44px; color: var(--text2); opacity: .5; }
 .empty-state strong  { color: var(--text); font-size: 16px; }
 
 .btn-empty-action {
@@ -1001,7 +1016,7 @@ input::placeholder { color: #5C6480; }
 }
 
 .empty-state.small       { padding: 28px 20px; gap: 5px; }
-.empty-state.small .big  { font-size: 32px; }
+.empty-state.small .empty-mark { width: 32px; height: 32px; }
 
 /* ─── Meals: edit modal ───────────────────────────────────────────────── */
 

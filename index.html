@@ -28,16 +28,24 @@
 
     <header class="app-header">
       <div class="header-left">
-        <span class="header-icon" aria-hidden="true">💪</span>
+        <svg class="header-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <g fill="currentColor">
+            <rect x="11" y="14.2" width="10" height="3.6" rx="1.2"/>
+            <rect x="7.2" y="10" width="3.8" height="12" rx="1.6"/>
+            <rect x="21" y="10" width="3.8" height="12" rx="1.6"/>
+            <rect x="3.6" y="12.4" width="3" height="7.2" rx="1.3"/>
+            <rect x="25.4" y="12.4" width="3" height="7.2" rx="1.3"/>
+          </g>
+        </svg>
         <div>
           <h1>Fuel &amp; Form</h1>
           <p id="header-date" role="button" tabindex="0" data-action="open-dates"></p>
         </div>
       </div>
       <div class="lang-switcher" role="group" aria-label="Language">
-        <button class="lang-btn active" data-lang="en" data-action="set-lang" data-arg="en" title="English" aria-label="English">🇺🇸</button>
-        <button class="lang-btn" data-lang="sq" data-action="set-lang" data-arg="sq" title="Shqip" aria-label="Shqip">🇦🇱</button>
-        <button class="lang-btn" data-lang="es" data-action="set-lang" data-arg="es" title="Español" aria-label="Español">🇪🇸</button>
+        <button class="lang-btn active" data-lang="en" data-action="set-lang" data-arg="en" title="English" aria-label="English">EN</button>
+        <button class="lang-btn" data-lang="sq" data-action="set-lang" data-arg="sq" title="Shqip" aria-label="Shqip">SQ</button>
+        <button class="lang-btn" data-lang="es" data-action="set-lang" data-arg="es" title="Español" aria-label="Español">ES</button>
       </div>
     </header>
 
@@ -61,7 +69,7 @@
         <div id="exercise-grid" class="exercise-grid"></div>
         <div class="complete-wrap">
           <button id="btn-complete" class="btn-complete" data-action="complete">
-            ✓ Mark Workout Complete
+            Mark Workout Complete
           </button>
         </div>
       </section>

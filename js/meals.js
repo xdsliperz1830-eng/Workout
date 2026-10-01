@@ -218,7 +218,11 @@ function renderMealList(meals) {
   if (!dayMeals.length) {
     container.innerHTML = `
       <div class="empty-state small">
-        <div class="big" aria-hidden="true">🍽️</div>
+        <svg class="empty-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="16" cy="16" r="10.5"/><circle cx="16" cy="16" r="5.5"/>
+          </g>
+        </svg>
         <strong>${sanitize(t('noMeals'))}</strong>
         <span>${sanitize(t('noMealsHint'))}</span>
       </div>
@@ -325,7 +329,7 @@ function submitMealForm() {
   form.reset();
   renderMealForm();
   form.elements.type.value = keepType;
-  toast(`🍽️ ${meal.name}`);
+  toast(meal.name);
 }
 
 // Called by the nutrition assistant when the user taps "Add to log".
@@ -343,7 +347,7 @@ function addMealFromEstimate(estimate) {
     fat:       Number(estimate.fat)      || 0,
   };
   addMeal(meal);
-  toast(`🍽️ ${meal.name}`);
+  toast(meal.name);
 }
 
 function deleteMeal(id) {

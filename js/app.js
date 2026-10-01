@@ -207,7 +207,8 @@ function renderHeaderDate() {
   const dateStr = new Date().toLocaleDateString(LOCALE_FOR[currentLang] || 'en-US',
     { weekday: 'long', month: 'long', day: 'numeric' });
   document.getElementById('header-date').innerHTML =
-    sanitize(dateStr) + '<span class="hd-cal"> 📅</span>';
+    sanitize(dateStr) +
+    '<svg class="hd-caret" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>';
 }
 
 // ─── Suggestion algorithm ─────────────────────────────────────────────────────
@@ -425,7 +426,6 @@ function refreshExercise(index) {
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
 function renderCard(ex, i, wt) {
-  const icon    = wt.icons[i % 4];
   const name    = sanitize(exName(ex));
   const muscles = sanitize(exMuscles(ex));
   const imgUrl  = safeUrl(ex.image || '');
@@ -443,7 +443,6 @@ function renderCard(ex, i, wt) {
           ? `<img class="ex-img" src="${imgUrl}" alt="${name}" loading="${i < 4 ? 'eager' : 'lazy'}">`
           : ''}
         <div class="ex-placeholder" style="${imgUrl ? 'display:none' : ''};background:${wt.gradient}">
-          <span style="font-size:36px" aria-hidden="true">${icon}</span>
           <span class="ex-placeholder-name">${name}</span>
         </div>
         <div class="ex-num">${i + 1}</div>
@@ -474,7 +473,6 @@ function renderHome() {
   // Suggestion card — uses only hardcoded data; sanitize for defence-in-depth
   document.getElementById('suggestion-card').innerHTML = `
     <div class="s-card" style="background:${wt.gradient}">
-      <span class="s-emoji" aria-hidden="true">${wt.emoji}</span>
       <div class="s-name">
         ${sanitize(wtName(wt))}
         ${done ? `<span class="done-badge">${sanitize(t('doneBadge'))}</span>` : ''}
@@ -522,7 +520,7 @@ function renderHome() {
 function renderWorkoutHeader(wt) {
   document.getElementById('workout-header').innerHTML = `
     <div class="wkt-header">
-      <h2>${wt.emoji} ${sanitize(wtName(wt))}</h2>
+      <h2>${sanitize(wtName(wt))}</h2>
       <p>${sanitize(wtDesc(wt))} · 8 ${sanitize(t('exercises'))}</p>
     </div>
   `;
@@ -543,7 +541,7 @@ function renderExercises(exercises, wt, alreadyDone) {
   if (!exercises.length) {
     grid.innerHTML = `
       <div class="loading-wrap">
-        <div>⚠️ ${sanitize(t('noConnection'))}</div>
+        <div>${sanitize(t('noConnection'))}</div>
       </div>
     `;
     return;
@@ -576,7 +574,12 @@ function renderHistory() {
   if (!history.length) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="big" aria-hidden="true">🏋️</div>
+        <svg class="empty-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M11 16h10"/><path d="M9 11.5v9"/><path d="M23 11.5v9"/>
+            <path d="M5.5 13.5v5"/><path d="M26.5 13.5v5"/>
+          </g>
+        </svg>
         <strong>${sanitize(t('noHistory'))}</strong>
         <span>${sanitize(t('noHistoryHint'))}</span>
         <button class="btn-empty-action" data-action="open-dates">${sanitize(t('selectDay'))}</button>
@@ -605,7 +608,6 @@ function renderHistory() {
             <div class="hist-name">${sanitize(wtName(wt))}</div>
             <div class="hist-date">${sanitize(formatDate(ds))}</div>
           </div>
-          <div class="hist-icon" aria-hidden="true">${wt.emoji}</div>
           <span class="hist-chevron" aria-hidden="true">›</span>
         </div>
       `);
@@ -744,7 +746,7 @@ function openDateSelector() {
 
     const right = document.createElement('span');
     right.className = 'date-sel-right';
-    right.textContent = wt ? wt.emoji : '+';
+    right.textContent = wt ? '' : '+';   // the row's colour bar and name already identify it
 
     row.appendChild(bar);
     row.appendChild(info);
@@ -798,13 +800,8 @@ function openDayPicker(dateStr) {
     info.appendChild(name);
     info.appendChild(mus);
 
-    const emoji = document.createElement('span');
-    emoji.className = 'dp-emoji';
-    emoji.textContent = wt.emoji;
-
     btn.appendChild(dot);
     btn.appendChild(info);
-    btn.appendChild(emoji);
 
     btn.addEventListener('click', () => {
       addToHistory(wt.id, dateStr);
@@ -937,7 +934,7 @@ function completeWorkout() {
   const { type } = activeWorkout;
   addToHistory(type.id);
   setCompleteBtn(true);
-  toast(`${type.emoji} ${wtName(type)}`);
+  toast(wtName(type));
 }
 
 // ─── Exercise detail modal ────────────────────────────────────────────────────
@@ -979,7 +976,6 @@ function openDetail(index) {
     const ph = document.createElement('div');
     ph.className = 'modal-img-placeholder';
     ph.style.background = activeWorkout.type.gradient;
-    ph.textContent = activeWorkout.type.emoji;
     box.appendChild(ph);
   }
 

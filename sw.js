@@ -9,7 +9,7 @@
  * Bump SHELL_CACHE when any shell file changes so clients pick it up.
  */
 
-const SHELL_CACHE = 'mtracker-shell-v4'; // v4: renamed to Fuel & Form
+const SHELL_CACHE = 'mtracker-shell-v5'; // v5: emoji removed, icon set
 const IMG_CACHE   = 'mtracker-img-v1';
 const IMG_LIMIT   = 120; // exercise photos to retain before trimming oldest
 

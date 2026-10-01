@@ -262,8 +262,8 @@ async function sendAiMessage(text) {
       id: createId(),
       role: 'assistant',
       isError: true,
-      content: `⚠︎ ${err.message}`,
-      parsed: { reply: `⚠︎ ${err.message}`, estimate: null },
+      content: `${err.message}`,
+      parsed: { reply: `${err.message}`, estimate: null },
     });
   } finally {
     pending.remove();
