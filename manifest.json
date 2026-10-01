@@ -1,6 +1,6 @@
 {
-  "name": "Muscle Tracker",
-  "short_name": "Muscles",
+  "name": "Fuel & Form",
+  "short_name": "Fuel & Form",
   "description": "Track muscle group workouts and meals: smart training suggestions plus daily nutrition against a calorie goal",
   "start_url": "./",
   "scope": "./",

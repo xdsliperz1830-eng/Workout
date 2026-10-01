@@ -1,4 +1,4 @@
-/* Muscle Tracker service worker.
+/* Fuel & Form service worker.
  *
  * The app is already offline-capable in principle — FALLBACK exercises and the
  * workout history both live client-side — but without a cached shell a
@@ -9,7 +9,7 @@
  * Bump SHELL_CACHE when any shell file changes so clients pick it up.
  */
 
-const SHELL_CACHE = 'mtracker-shell-v3'; // v3: deep-glass restyle
+const SHELL_CACHE = 'mtracker-shell-v4'; // v4: renamed to Fuel & Form
 const IMG_CACHE   = 'mtracker-img-v1';
 const IMG_LIMIT   = 120; // exercise photos to retain before trimming oldest
 
