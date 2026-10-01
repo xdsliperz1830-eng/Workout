@@ -3,15 +3,31 @@
      meal form doesn't punch white boxes through the theme. */
   color-scheme: dark;
 
-  --bg: #0F0F0F;
-  --surface: #1A1A1A;
-  --surface2: #252525;
-  --border: #2A2A2A;
-  --text: #FFFFFF;
-  --text2: #888888;
+  /* Deep glass: an indigo-navy ground with translucent, blurred surfaces.
+     --surface / --surface2 / --border keep their old names so every existing
+     rule picks up the glass treatment without being rewritten. */
+  --bg:        #0B0E1A;
+  --bg-2:      #0E1324;
+  --surface:   rgba(255, 255, 255, .055);
+  --surface2:  rgba(255, 255, 255, .085);
+  --surface3:  rgba(255, 255, 255, .13);
+  --border:    rgba(255, 255, 255, .10);
+  --text:      #EDEFF7;
+  --text2:     #8C95B3;
+
+  --violet:    #7C5CFF;
+  --cyan:      #34D5E0;
+  --accent:    linear-gradient(135deg, #7C5CFF 0%, #34D5E0 100%);
+  --danger:    #FF5C7A;
+  --warn:      #FFB357;
+
+  --blur:      saturate(160%) blur(22px);
+  --lift:      0 8px 32px rgba(0, 0, 0, .38);
+  --inset-hi:  inset 0 1px 0 rgba(255, 255, 255, .07);
+
   --nav-h: 64px;
   --header-h: 60px;
-  --r: 14px;
+  --r: 18px;
   --t: 0.2s ease;
   /* set by JS for accurate iOS viewport height */
   --app-h: 100dvh;
@@ -45,6 +61,20 @@ html {
   height: -webkit-fill-available;
 }
 
+/* Ambient light pools behind everything — this is what stops a dark theme from
+   reading as flat black. Fixed, non-interactive, beneath the app layer. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(760px 520px at 12% -8%, rgba(124, 92, 255, .26), transparent 62%),
+    radial-gradient(680px 520px at 98% 4%,  rgba(52, 213, 224, .15), transparent 60%),
+    radial-gradient(900px 700px at 50% 108%, rgba(124, 92, 255, .14), transparent 62%);
+}
+
 body {
   height: 100vh;
   height: var(--app-h);
@@ -61,6 +91,8 @@ body {
 /* ─── App shell ──────────────────────────────────── */
 
 #app {
+  position: relative;   /* sits above the ambient gradient layer */
+  z-index: 1;
   display: flex;
   flex-direction: column;
   /* Use JS-measured height so iOS Safari URL bar doesn't clip content */
@@ -78,7 +110,9 @@ body {
   padding: 0 16px 12px;
   /* Push content below status bar / Dynamic Island */
   padding-top: max(var(--sat), 12px);
-  background: var(--bg);
+  background: rgba(11, 14, 26, .72);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   min-height: calc(var(--header-h) + var(--sat));
@@ -170,7 +204,7 @@ body {
 /* Cards and rows are keyboard-focusable now, so the focus ring has to be
    visible — but only for keyboard users, not on tap. */
 :focus-visible {
-  outline: 2px solid #2ECC71;
+  outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
 
@@ -262,9 +296,9 @@ body {
 .status-right   { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: 8px; }
 .status-days    { font-size: 12px; color: var(--text2); }
 .status-chevron { font-size: 20px; font-weight: 300; color: var(--text2); line-height: 1; }
-.status-days.ripe   { color: #E74C3C; }
-.status-days.medium { color: #F39C12; }
-.status-days.fresh  { color: #2ECC71; }
+.status-days.ripe   { color: var(--danger); }
+.status-days.medium { color: var(--warn); }
+.status-days.fresh  { color: var(--cyan); }
 
 /* ─── Workout header ─────────────────────────────── */
 
@@ -371,7 +405,7 @@ body {
   width: 100%;
   padding: 15px;
   border-radius: var(--r);
-  background: linear-gradient(135deg, #1E8449, #27AE60);
+  background: var(--accent);
   color: #fff;
   font-size: 16px;
   font-weight: 700;
@@ -432,7 +466,7 @@ body {
   transition: var(--t);
   flex-shrink: 0;
 }
-.btn-clear-history:active { background: #3A1A1A; color: #E74C3C; }
+.btn-clear-history:active { background: rgba(255,92,122,.14); color: var(--danger); }
 
 .hist-confirm {
   display: flex;
@@ -470,7 +504,7 @@ body {
 .btn-confirm-clear {
   padding: 6px 12px;
   border-radius: 8px;
-  background: #C0392B;
+  background: var(--danger);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -618,7 +652,7 @@ body {
 
 .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
 .modal-mus   { font-size: 13px; color: var(--text2); margin-bottom: 0; }
-.modal-desc  { font-size: 14px; line-height: 1.65; color: #ccc; }
+.modal-desc  { font-size: 14px; line-height: 1.65; color: #C3C9DE; }
 
 /* ─── Proto box (Sets / Reps / Rest) ────────────────────── */
 
@@ -658,7 +692,7 @@ body {
   bottom: calc(var(--nav-h) + var(--sab) + 14px);
   left: 50%;
   transform: translateX(-50%) translateY(16px);
-  background: #27AE60;
+  background: var(--cyan);
   color: #fff;
   padding: 11px 20px;
   border-radius: 100px;
@@ -679,7 +713,9 @@ body {
 
 .bottom-nav {
   display: flex;
-  background: #161616;
+  background: rgba(11, 14, 26, .72);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
   border-top: 1px solid var(--border);
   /* Height grows to cover the home indicator area */
   padding-bottom: var(--sab);
@@ -728,10 +764,10 @@ input, select {
   border-radius: 8px;
   padding: 9px 10px;
 }
-input::placeholder { color: #5A5A5A; }
+input::placeholder { color: #5C6480; }
 
 .btn-primary {
-  background: linear-gradient(135deg, #1E8449, #27AE60);
+  background: var(--accent);
   color: #fff;
   font-size: 14px;
   font-weight: 700;
@@ -759,8 +795,8 @@ input::placeholder { color: #5A5A5A; }
 .btn-secondary:active { background: var(--border); }
 
 .btn-danger {
-  background: #3A1A1A;
-  color: #E74C3C;
+  background: rgba(255,92,122,.14);
+  color: var(--danger);
   font-size: 14px;
   font-weight: 700;
   padding: 11px 16px;
@@ -768,7 +804,7 @@ input::placeholder { color: #5A5A5A; }
   cursor: pointer;
   touch-action: manipulation;
 }
-.btn-danger:active { background: #4A2020; }
+.btn-danger:active { background: rgba(255,92,122,.22); }
 
 .btn-link {
   background: none;
@@ -792,11 +828,11 @@ input::placeholder { color: #5A5A5A; }
 .progress-bar {
   height: 100%;
   width: 0;
-  background: #2ECC71;
+  background: var(--cyan);
   border-radius: 999px;
   transition: width .25s ease;
 }
-.progress-bar.over { background: #E74C3C; }
+.progress-bar.over { background: var(--danger); }
 
 /* 4-up stat tiles, used by daily totals and the 7-day average */
 .stat-row {
@@ -843,13 +879,13 @@ input::placeholder { color: #5A5A5A; }
 }
 .bar {
   width: 62%;
-  background: #1E8449;
+  background: var(--violet);
   border-radius: 4px 4px 0 0;
   min-height: 2px;
   transition: height .25s ease;
 }
-.bar.over { background: #E74C3C; }
-.bar-col.selected .bar { background: #2ECC71; }
+.bar.over { background: var(--danger); }
+.bar-col.selected .bar { background: var(--cyan); }
 .bar-day {
   font-size: 9.5px;
   color: var(--text2);
@@ -878,8 +914,8 @@ input::placeholder { color: #5A5A5A; }
 .nut-kcal      { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
 .nut-kcal-val  { font-size: 26px; font-weight: 900; letter-spacing: -.5px; line-height: 1; }
 .nut-kcal-unit { font-size: 12px; color: var(--text2); }
-.nut-status    { font-size: 11.5px; color: #2ECC71; text-align: right; flex-shrink: 0; }
-.nut-status.over { color: #E74C3C; }
+.nut-status    { font-size: 11.5px; color: var(--cyan); text-align: right; flex-shrink: 0; }
+.nut-status.over { color: var(--danger); }
 
 .nut-macros {
   display: flex;
@@ -1009,7 +1045,7 @@ input::placeholder { color: #5A5A5A; }
 }
 .chat-user {
   align-self: flex-end;
-  background: #1E8449;
+  background: var(--violet);
   color: #fff;
   border-bottom-right-radius: 5px;
 }
@@ -1018,7 +1054,7 @@ input::placeholder { color: #5A5A5A; }
   background: var(--surface);
   border-bottom-left-radius: 5px;
 }
-.chat-assistant.chat-error { background: #3A1A1A; color: #F5B7B1; }
+.chat-assistant.chat-error { background: rgba(255,92,122,.14); color: #FFC2CE; }
 .chat-pending { color: var(--text2); font-style: italic; }
 .chat-reply   { white-space: pre-wrap; }
 
@@ -1073,3 +1109,136 @@ input::placeholder { color: #5A5A5A; }
 @media (max-width: 360px) {
   .stat-row { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEEP GLASS PASS
+   Depth comes from three layers: the ambient gradient on body::before, the
+   translucent surfaces above it, and a 1px top highlight that fakes a lit edge.
+   Real backdrop-filter is reserved for the large chrome — blurring every list
+   row costs GPU on a phone for an effect the translucency already gives.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.nut-card,
+.modal-box {
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+}
+
+.nut-card,
+.status-row,
+.hist-item,
+.meal-item,
+.ex-card,
+.day-picker-btn,
+.date-sel-row,
+.hist-confirm,
+.stat-row > div,
+.est-card,
+.modal-box,
+.chat-assistant {
+  border: 1px solid var(--border);
+  box-shadow: var(--inset-hi), var(--lift);
+}
+
+.stat-row > div,
+.est-card,
+.chat-assistant { box-shadow: var(--inset-hi); }   /* small marks: highlight only */
+
+.status-row,
+.hist-item,
+.meal-item,
+.ex-card,
+.nut-card { border-radius: 16px; }
+
+.modal-box { border-radius: 24px; }
+
+/* ─── Accent surfaces ─────────────────────────────────────────────────── */
+
+.progress-bar {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(124, 92, 255, .45);
+}
+.progress-bar.over {
+  background: linear-gradient(135deg, #FF5C7A, #FF9B6A);
+  box-shadow: 0 0 12px rgba(255, 92, 122, .45);
+}
+
+/* Single series, so one hue light→dark; height alone carries the value.
+   Status (over goal) and selection (today) are the only other states. */
+.bar {
+  background: linear-gradient(180deg, #34D5E0 0%, #1C6F92 100%);
+  border-radius: 5px 5px 0 0;
+}
+.bar.over { background: linear-gradient(180deg, #FF8098 0%, #B33A52 100%); }
+.bar-col.selected .bar {
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(124, 92, 255, .5);
+}
+.bar-col.selected .bar-val { color: var(--text); font-weight: 700; }
+
+.s-card {
+  border-radius: 22px;
+  box-shadow: var(--inset-hi), 0 14px 40px rgba(0, 0, 0, .45);
+}
+.s-card::after { width: 220px; height: 220px; background: rgba(255, 255, 255, .08); }
+
+.done-badge {
+  background: rgba(255, 255, 255, .22);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* ─── Bottom nav: gradient indicator on the active tab ────────────────── */
+
+.nav-btn { position: relative; }
+.nav-btn.active { color: var(--text); }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(124, 92, 255, .6);
+}
+.nav-btn.active svg { color: var(--cyan); }
+
+/* ─── Language switcher ───────────────────────────────────────────────── */
+
+.lang-btn.active {
+  border-color: rgba(124, 92, 255, .55);
+  background: rgba(124, 92, 255, .14);
+}
+
+/* ─── Type ────────────────────────────────────────────────────────────── */
+
+h1, .s-name, .nut-kcal-val, .stat-val, .meal-date-label, .modal-title, .wkt-header h2 {
+  letter-spacing: -.02em;
+}
+.section-label { color: var(--text2); opacity: .9; }
+
+/* Chat bubbles from the user ride the accent instead of flat green */
+.chat-user { background: var(--accent); color: #fff; }
+
+/* Focus ring picks up the theme */
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* Spinner on theme */
+.spinner { border-color: var(--surface2); border-top-color: var(--cyan); }
+
+/* Toast as a glass pill */
+.toast {
+  background: rgba(20, 26, 46, .92);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--lift);
+}
+
+/* iOS: translucent surfaces over a blurred backdrop need the scroll container
+   to stay opaque-free, otherwise the ambient layer is clipped away. */
+#main { background: transparent; }
