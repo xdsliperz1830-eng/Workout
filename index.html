@@ -90,24 +90,11 @@
         </div>
         <div class="progress"><div class="progress-bar" id="meal-goal-bar"></div></div>
 
-        <div id="label-add-meal" class="section-label section-label-spaced"></div>
-        <form id="meal-form" class="meal-form">
-          <label class="field-wide">
-            <span data-i18n="foodName"></span>
-            <input name="name" type="text" required autocomplete="off">
-          </label>
-          <div class="field-row">
-            <label><span data-i18n="mealType"></span><select name="type"></select></label>
-            <label><span data-i18n="servings"></span><input name="servings" type="number" value="1" min="0.25" step="0.25" required inputmode="decimal"></label>
-          </div>
-          <div class="field-row">
-            <label><span data-i18n="calories"></span><input name="calories" type="number" min="0" step="1" placeholder="0" required inputmode="numeric"></label>
-            <label><span data-i18n="protein"></span><input name="protein" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
-            <label><span data-i18n="carbs"></span><input name="carbs" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
-            <label><span data-i18n="fat"></span><input name="fat" type="number" min="0" step="0.1" placeholder="0" required inputmode="decimal"></label>
-          </div>
-          <button type="submit" id="btn-add-meal" class="btn-primary btn-block"></button>
-        </form>
+        <!-- Fastest path first: one tap re-logs something eaten before. -->
+        <div id="quick-wrap" class="hidden">
+          <div id="label-quick" class="section-label section-label-spaced"></div>
+          <div id="quick-log" class="quick-row"></div>
+        </div>
 
         <div id="label-assistant" class="section-label section-label-spaced"></div>
         <p id="hint-assistant" class="muted hint"></p>
@@ -120,6 +107,32 @@
         <button type="button" class="btn-link ai-clear" data-action="ai-clear-chat">
           <span id="ai-clear-label"></span>
         </button>
+
+        <!-- Typing five fields is the slow path, so it starts collapsed. -->
+        <details class="manual-entry">
+          <summary>
+            <span id="label-manual"></span>
+            <svg class="summary-caret" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+          </summary>
+          <form id="meal-form" class="meal-form">
+            <label class="field-wide">
+              <span data-i18n="foodName"></span>
+              <input name="name" type="text" required autocomplete="off">
+            </label>
+            <div class="field-row">
+              <label><span data-i18n="mealType"></span><select name="type"></select></label>
+              <label><span data-i18n="servings"></span><input name="servings" type="number" value="1" min="0.25" step="0.25" required inputmode="decimal"></label>
+            </div>
+            <div class="field-row">
+              <label><span data-i18n="calories"></span><input name="calories" type="number" min="0" step="1" placeholder="0" required inputmode="numeric"></label>
+              <!-- Macros are optional: calorie-only logging shouldn't cost three extra fields. -->
+              <label><span data-i18n="protein"></span><input name="protein" type="number" min="0" step="0.1" placeholder="0" inputmode="decimal"></label>
+              <label><span data-i18n="carbs"></span><input name="carbs" type="number" min="0" step="0.1" placeholder="0" inputmode="decimal"></label>
+              <label><span data-i18n="fat"></span><input name="fat" type="number" min="0" step="0.1" placeholder="0" inputmode="decimal"></label>
+            </div>
+            <button type="submit" id="btn-add-meal" class="btn-primary btn-block"></button>
+          </form>
+        </details>
 
         <div id="label-logged" class="section-label section-label-spaced"></div>
         <div id="meal-list"></div>

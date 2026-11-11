@@ -115,7 +115,7 @@ function renderMealsView() {
   const meals = loadMeals();
 
   // Static labels
-  setText('label-add-meal',    t('addMeal'));
+  setText('label-manual',      t('enterManually'));
   setText('label-meal-totals', t('dailyTotals'));
   setText('label-logged',      t('loggedMeals'));
   setText('label-week-nut',    t('weekNutrition'));
@@ -127,12 +127,15 @@ function renderMealsView() {
   setText('btn-import-label',  t('importCsv'));
 
   const goalInput = document.getElementById('meal-goal');
-  goalInput.placeholder = t('dailyGoal');
+  // Short placeholder: the field is narrow and "Daily goal (kcal)" clipped
+  // mid-word in every language. The status line beside it carries the meaning.
+  goalInput.placeholder = t('kcal');
   const goal = loadGoal();
   if (goal > 0 && goalInput.value === '') goalInput.value = goal;
 
   renderMealForm();
   renderMealDateBar();
+  renderQuickLog(meals);
   renderMealTotals(meals);
   renderMealList(meals);
   renderWeekNutrition(meals);
@@ -291,6 +294,57 @@ function renderWeekNutrition(meals) {
   `).join('');
 }
 
+// ─── Quick log ────────────────────────────────────────────────────────────────
+
+const QUICK_LIMIT = 8;
+
+// Addressed by index so a name containing quotes never has to survive a trip
+// through a data attribute.
+let quickItems = [];
+
+// Most-repeated meals first. Each carries the macros from the most recent time
+// it was logged, since that is the version the user most likely means.
+function frequentMeals(meals, limit = QUICK_LIMIT) {
+  const byName = new Map();
+  for (const m of meals) {
+    const key = String(m.name || '').trim().toLowerCase();
+    if (!key) continue;
+    const seen = byName.get(key);
+    if (!seen) {
+      byName.set(key, { meal: m, count: 1 });
+    } else {
+      seen.count++;
+      if ((m.createdAt || 0) > (seen.meal.createdAt || 0)) seen.meal = m;
+    }
+  }
+  return [...byName.values()]
+    .sort((a, b) => (b.count - a.count) ||
+                    ((b.meal.createdAt || 0) - (a.meal.createdAt || 0)))
+    .slice(0, limit)
+    .map(e => e.meal);
+}
+
+function renderQuickLog(meals) {
+  const wrap = document.getElementById('quick-wrap');
+  const row  = document.getElementById('quick-log');
+  if (!wrap || !row) return;
+
+  quickItems = frequentMeals(meals);
+  wrap.classList.toggle('hidden', quickItems.length === 0);
+  if (!quickItems.length) return;
+
+  setText('label-quick', t('quickLog'));
+  row.innerHTML = quickItems.map((m, i) => {
+    const s = Number(m.servings) || 1;
+    return `
+      <button type="button" class="quick-chip" data-action="meal-quick" data-arg="${i}">
+        <span class="quick-name">${sanitize(m.name)}</span>
+        <span class="quick-kcal">${num(m.calories * s)} ${sanitize(t('kcal'))}</span>
+      </button>
+    `;
+  }).join('');
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 function addMeal(meal) {
@@ -356,10 +410,11 @@ function deleteMeal(id) {
 }
 
 function afterMealChange() {
-  renderMealTotals(loadMeals());
   const meals = loadMeals();
+  renderMealTotals(meals);
   renderMealList(meals);
   renderWeekNutrition(meals);
+  renderQuickLog(meals);
   renderTodayNutrition();
 }
 
@@ -550,6 +605,25 @@ Object.assign(ACTIONS, {
   'meal-add':    () => submitMealForm(),
   'meal-edit':   id => openMealEditor(id),
   'meal-export': () => exportMealsCsv(),
+  // One tap re-logs a meal already eaten before, at the serving it was last
+  // logged with. Adjusting it afterwards goes through the edit modal.
+  'meal-quick':  idx => {
+    const tpl = quickItems[Number(idx)];
+    if (!tpl) return;
+    addMeal({
+      id:        createId(),
+      createdAt: Date.now(),
+      name:      tpl.name,
+      type:      defaultMealType(),
+      date:      mealDate,
+      servings:  Number(tpl.servings) || 1,
+      calories:  Number(tpl.calories) || 0,
+      protein:   Number(tpl.protein)  || 0,
+      carbs:     Number(tpl.carbs)    || 0,
+      fat:       Number(tpl.fat)      || 0,
+    });
+    toast(tpl.name);
+  },
 });
 
 onInit(() => {
