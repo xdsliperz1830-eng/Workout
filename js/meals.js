@@ -294,20 +294,68 @@ function renderWeekNutrition(meals) {
   `).join('');
 }
 
-// ─── Quick log ────────────────────────────────────────────────────────────────
+// ─── Favourites & quick log ───────────────────────────────────────────────────
 
-const QUICK_LIMIT = 8;
+const FAVOURITES_KEY = 'mealtracker.favourites.v1';
+const QUICK_RECENTS  = 8;   // frequency-ranked slots
+const QUICK_TOTAL    = 14;  // hard cap on the row
 
 // Addressed by index so a name containing quotes never has to survive a trip
 // through a data attribute.
 let quickItems = [];
 
+const STAR_PATH = 'M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
+
+function favKey(name) { return String(name || '').trim().toLowerCase(); }
+
+function loadFavourites() {
+  try {
+    const parsed = JSON.parse(lsGet(FAVOURITES_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(f => f && typeof f.name === 'string' && f.name.trim());
+  } catch {
+    return [];
+  }
+}
+
+function saveFavourites(list) {
+  lsSet(FAVOURITES_KEY, JSON.stringify(list.slice(0, QUICK_TOTAL)));
+}
+
+function isFavourite(name) {
+  const key = favKey(name);
+  return loadFavourites().some(f => favKey(f.name) === key);
+}
+
+// Pin a meal as a reusable template, or unpin it. Returns the resulting state.
+// Favourites are stored by name, so re-pinning an edited meal replaces it.
+function toggleFavourite(meal) {
+  const key  = favKey(meal.name);
+  const list = loadFavourites();
+  const at   = list.findIndex(f => favKey(f.name) === key);
+  if (at >= 0) {
+    list.splice(at, 1);
+  } else {
+    list.unshift({
+      name:     String(meal.name).trim(),
+      type:     meal.type,
+      servings: Number(meal.servings) || 1,
+      calories: Number(meal.calories) || 0,
+      protein:  Number(meal.protein)  || 0,
+      carbs:    Number(meal.carbs)    || 0,
+      fat:      Number(meal.fat)      || 0,
+    });
+  }
+  saveFavourites(list);
+  return at < 0;
+}
+
 // Most-repeated meals first. Each carries the macros from the most recent time
 // it was logged, since that is the version the user most likely means.
-function frequentMeals(meals, limit = QUICK_LIMIT) {
+function frequentMeals(meals, limit = QUICK_RECENTS) {
   const byName = new Map();
   for (const m of meals) {
-    const key = String(m.name || '').trim().toLowerCase();
+    const key = favKey(m.name);
     if (!key) continue;
     const seen = byName.get(key);
     if (!seen) {
@@ -324,23 +372,41 @@ function frequentMeals(meals, limit = QUICK_LIMIT) {
     .map(e => e.meal);
 }
 
+// Favourites stay pinned however long ago they were last eaten; the rest of the
+// row is filled with whatever has been logged most often.
+function buildQuickItems(meals) {
+  const favs  = loadFavourites().map(f => ({ ...f, fav: true }));
+  const taken = new Set(favs.map(f => favKey(f.name)));
+  const rest  = frequentMeals(meals)
+    .filter(m => !taken.has(favKey(m.name)))
+    .map(m => ({ ...m, fav: false }));
+  return [...favs, ...rest].slice(0, QUICK_TOTAL);
+}
+
 function renderQuickLog(meals) {
   const wrap = document.getElementById('quick-wrap');
   const row  = document.getElementById('quick-log');
   if (!wrap || !row) return;
 
-  quickItems = frequentMeals(meals);
+  quickItems = buildQuickItems(meals);
   wrap.classList.toggle('hidden', quickItems.length === 0);
   if (!quickItems.length) return;
 
   setText('label-quick', t('quickLog'));
   row.innerHTML = quickItems.map((m, i) => {
-    const s = Number(m.servings) || 1;
+    const s     = Number(m.servings) || 1;
+    const label = m.fav ? t('removeFav') : t('saveFav');
     return `
-      <button type="button" class="quick-chip" data-action="meal-quick" data-arg="${i}">
-        <span class="quick-name">${sanitize(m.name)}</span>
-        <span class="quick-kcal">${num(m.calories * s)} ${sanitize(t('kcal'))}</span>
-      </button>
+      <div class="quick-chip${m.fav ? ' is-fav' : ''}">
+        <button type="button" class="quick-body" data-action="meal-quick" data-arg="${i}">
+          <span class="quick-name">${sanitize(m.name)}</span>
+          <span class="quick-kcal">${num(m.calories * s)} ${sanitize(t('kcal'))}</span>
+        </button>
+        <button type="button" class="quick-star" data-action="meal-fav" data-arg="${i}"
+                aria-pressed="${m.fav}" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>
+        </button>
+      </div>
     `;
   }).join('');
 }
@@ -469,6 +535,10 @@ function openMealEditor(id) {
         <input name="fat" type="number" min="0" step="0.1" required value="${escapeAttr(meal.fat)}" />
       </label>
     </div>
+    <button type="button" class="btn-secondary btn-block fav-toggle${isFavourite(meal.name) ? ' is-fav' : ''}" data-role="fav">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>
+      <span>${sanitize(isFavourite(meal.name) ? t('removeFav') : t('saveFav'))}</span>
+    </button>
     <div class="modal-actions">
       <button type="submit" class="btn-primary">${sanitize(t('save'))}</button>
       <button type="button" class="btn-danger" data-role="delete">${sanitize(t('del'))}</button>
@@ -502,6 +572,25 @@ function openMealEditor(id) {
   form.querySelector('[data-role="delete"]').addEventListener('click', () => {
     deleteMeal(meal.id);
     close();
+  });
+
+  // Pin using whatever is currently in the form, so correcting the macros and
+  // then starring saves the corrected version rather than the stored one.
+  const favBtn = form.querySelector('[data-role="fav"]');
+  favBtn.addEventListener('click', () => {
+    const data = new FormData(form);
+    const nowFav = toggleFavourite({
+      name:     String(data.get('name') || meal.name).trim(),
+      type:     String(data.get('type')),
+      servings: Number(data.get('servings')) || 1,
+      calories: Number(data.get('calories')) || 0,
+      protein:  Number(data.get('protein'))  || 0,
+      carbs:    Number(data.get('carbs'))    || 0,
+      fat:      Number(data.get('fat'))      || 0,
+    });
+    favBtn.classList.toggle('is-fav', nowFav);
+    favBtn.querySelector('span').textContent = nowFav ? t('removeFav') : t('saveFav');
+    renderQuickLog(loadMeals());
   });
 
   box.appendChild(form);
@@ -623,6 +712,14 @@ Object.assign(ACTIONS, {
       fat:       Number(tpl.fat)      || 0,
     });
     toast(tpl.name);
+  },
+  // The star is its own tap target on the chip, so a favourite can be removed
+  // from the same place it appears — no need to find it in the log first.
+  'meal-fav': idx => {
+    const item = quickItems[Number(idx)];
+    if (!item) return;
+    toggleFavourite(item);
+    renderQuickLog(loadMeals());
   },
 });
 

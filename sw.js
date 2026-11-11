@@ -9,7 +9,7 @@
  * Bump SHELL_CACHE when any shell file changes so clients pick it up.
  */
 
-const SHELL_CACHE = 'mtracker-shell-v6'; // v6: quick-log chips
+const SHELL_CACHE = 'mtracker-shell-v7'; // v7: favourites
 const IMG_CACHE   = 'mtracker-img-v1';
 const IMG_LIMIT   = 120; // exercise photos to retain before trimming oldest
 

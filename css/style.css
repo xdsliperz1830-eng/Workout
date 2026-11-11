@@ -1270,23 +1270,69 @@ h1, .s-name, .nut-kcal-val, .stat-val, .meal-date-label, .modal-title, .wkt-head
 }
 .quick-row::-webkit-scrollbar { display: none; }
 
+/* Two tap targets: the body logs the meal, the star pins or unpins it. */
 .quick-chip {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding: 10px 13px;
+  align-items: stretch;
   border-radius: 13px;
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--inset-hi);
+  overflow: hidden;
+}
+.quick-chip.is-fav { border-color: rgba(124, 92, 255, .45); }
+
+.quick-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 11px 10px 13px;
+  background: none;
   cursor: pointer;
   touch-action: manipulation;
   text-align: left;
-  transition: transform var(--t), background var(--t);
+  transition: background var(--t);
 }
-.quick-chip:active { transform: scale(.96); background: var(--surface2); }
+.quick-body:active { background: var(--surface2); }
+
+.quick-star {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  flex-shrink: 0;
+  background: none;
+  border-left: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color var(--t), background var(--t);
+}
+.quick-star:active { background: var(--surface2); }
+.quick-star svg,
+.fav-toggle svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.quick-chip.is-fav .quick-star { color: var(--violet); }
+.quick-chip.is-fav .quick-star svg,
+.fav-toggle.is-fav svg { fill: currentColor; stroke: none; }
+
+.fav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.fav-toggle.is-fav { color: var(--violet); }
 .quick-name {
   font-size: 13px;
   font-weight: 700;
